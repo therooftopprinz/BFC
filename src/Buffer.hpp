@@ -21,7 +21,7 @@ public:
         reset();
     }
 
-    BufferImpl(const BufferImpl&) = delete;
+    BufferImpl(const BufferImpl&) = default;
     void operator=(const BufferImpl&) = delete;
 
 
