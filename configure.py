@@ -17,6 +17,7 @@ class Build:
         self.output_file = ''
         self.src_dir = ''
         self.dependencies = []
+        self.external_dependencies = []
         self.target_type = 0
         self.cxxflags = ''
         self.linkflags = ''
@@ -27,7 +28,7 @@ class Build:
     def set_linkflags(self, f):
         self.linkflags = f
     def set_src_dir(self, d):
-        self.src_dir = d
+        self.src_dir = TLD+d
     def add_src_files(self, f):
         self.name = f
         self.input_files.extend(f)
@@ -41,6 +42,8 @@ class Build:
         self.target_type = 1
     def add_dependencies(self, d):
         self.dependencies.extend(d)
+    def add_external_dependencies(self, d):
+        self.external_dependencies.extend(d)
     def generate_make(self):
         output = ''
         objects = [self.name+'/'+i+'.o' for i in self.input_files]
@@ -53,7 +56,7 @@ class Build:
         output = output + self.output_file + ':' + ' '.join(self.dependencies)+' '+' '.join(objects) + '\n'
         # target rule
         if (self.target_type == 0):
-            output = output + '\t'+ CXX + ' ' + ' '.join(objects) + ' ' + ' '.join(self.dependencies) + ' ' + self.linkflags +  ' -o ' + self.output_file + '\n'
+            output = output + '\t'+ CXX + ' ' + ' '.join(objects) + ' ' + ' '.join(self.dependencies) + ' ' + ' '.join([TLD+i for i in self.external_dependencies]) + ' ' + self.linkflags +  ' -o ' + self.output_file + '\n'
         else:
             output = output + '\t'+ AR + ' rcs ' + self.linkflags + ' ' + self.output_file + ' ' + ' '.join(objects) + '\n'
 
@@ -82,7 +85,7 @@ print "TEST_SOURCES",TEST_SOURCES
 
 gtest = Build()
 gtest.set_cxxflags(CXXFLAGS)
-gtest.set_src_dir(TLD+'gtest/')
+gtest.set_src_dir('gtest/')
 gtest.add_src_files(['gmock-gtest-all.cc'])
 gtest.add_include_paths(['gtest'])
 gtest.target_archive('gtest.a')
@@ -91,7 +94,7 @@ test = Build()
 test.set_cxxflags(CXXFLAGS)
 test.add_include_paths(['gtest'])
 test.add_include_paths(['src/'])
-test.set_src_dir(TLD+'tests/')
+test.set_src_dir('tests/')
 test.add_src_files(TEST_SOURCES)
 test.add_dependencies(['gtest.a'])
 test.set_linkflags('-lpthread')
