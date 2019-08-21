@@ -12,9 +12,9 @@ class BufferImpl
     static_assert(sizeof(T)==1);
 public:
     template <typename U>
-    BufferImpl(U* pData,size_t pSize)
+    BufferImpl(U* pData, size_t pSize)
         : mSize(pSize)
-        , mData(reinterpret_cast<T*>(pData))
+        , mData(pData)
     {
         static_assert(sizeof(U)==1);
     }
@@ -77,14 +77,16 @@ private:
     T* mData = nullptr;
 };
 
-using Buffer = BufferImpl<uint8_t>;
-using ConstBuffer = BufferImpl<const uint8_t>;
+using Buffer = BufferImpl<std::byte>;
+using ConstBuffer = BufferImpl<const std::byte>;
 
 template<typename T>
 class BufferViewImpl
 {
     using NCT = typename std::remove_const<T>::type;
     using CT = typename std::add_const<NCT>::type;
+    static constexpr bool IS_T_CONST = std::is_const<T>::value;
+    static_assert(sizeof(T)==1);
 public:
     /* Constructors
     ** NCT -> CT  OK
@@ -100,11 +102,13 @@ public:
     {}
 
     template <typename U>
-    BufferViewImpl(U data, size_t size,
-        typename std::enable_if<std::is_same<U,NCT*>::value||std::is_same<U,T*>::value>::type* = 0)
+    BufferViewImpl(U* data, size_t size,
+        typename std::enable_if<(std::is_const<U>::value && IS_T_CONST) || !std::is_const<U>::value>::type* = 0)
         : mSize(size)
         , mData(data)
-    {}
+    {
+        static_assert(sizeof(U)==1);
+    }
 
     template<template<class> class U, class V>
     typename std::enable_if<std::is_same<V,NCT>::value||std::is_same<V,T>::value,BufferViewImpl>::type&
@@ -130,8 +134,8 @@ private:
     T* mData = nullptr;
 };
 
-using BufferView = BufferViewImpl<uint8_t>;
-using ConstBufferView = BufferViewImpl<const uint8_t>;
+using BufferView = BufferViewImpl<std::byte>;
+using ConstBufferView = BufferViewImpl<const std::byte>;
 
 } // namespace bfc
 
