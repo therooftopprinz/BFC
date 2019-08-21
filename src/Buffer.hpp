@@ -9,11 +9,14 @@ namespace bfc
 template<typename T>
 class BufferImpl
 {
+    static_assert(sizeof(T)==1);
 public:
-    BufferImpl(T* pData,size_t pSize)
+    template <typename U>
+    BufferImpl(U* pData,size_t pSize)
         : mSize(pSize)
-        , mData(pData)
+        , mData(reinterpret_cast<T*>(pData))
     {
+        static_assert(sizeof(U)==1);
     }
 
     ~BufferImpl()
@@ -21,7 +24,8 @@ public:
         reset();
     }
 
-    BufferImpl(const BufferImpl&) = default;
+    BufferImpl() = default;
+    BufferImpl(const BufferImpl&) = delete;
     void operator=(const BufferImpl&) = delete;
 
 
