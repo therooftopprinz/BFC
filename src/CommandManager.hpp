@@ -55,7 +55,7 @@ public:
     {
         using namespace std::string_literals;
 
-        const std::regex cmdArgsPattern("^([\\S]+)[\\s]+(.*)$");
+        const std::regex cmdArgsPattern("^([\\S]+)[\\s]*(.*)$");
         std::string cmd;
         std::string args;
         ArgsMap argsMap;
@@ -84,7 +84,7 @@ public:
         auto cmdfnIt = mCmds.find(cmd);
         if (mCmds.end() == cmdfnIt)
         {
-            return "command not found: "s+cmd;
+            return "command not found: \""s+cmd+"\"";
         }
         return cmdfnIt->second(std::move(argsMap));
     }
