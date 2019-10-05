@@ -13,6 +13,25 @@ class FixedFunctionObject
 public:
 FixedFunctionObject() = default;
 
+FixedFunctionObject(const FixedFunctionObject& pOther)
+{
+    pOther.mCopier(mObject, pOther.mObject);
+    mFn = pOther.mFn;
+    mDestroyer = pOther.mDestroyer;
+    mCopier = pOther.mCopier;
+}
+
+FixedFunctionObject(FixedFunctionObject&& pOther)
+{
+    std::memcpy(mObject, pOther.mObject, N);
+    mFn = pOther.mFn;
+    mDestroyer = pOther.mDestroyer;
+    mCopier = pOther.mCopier;
+    pOther.mFn = nullptr;
+    pOther.mDestroyer = nullptr;
+    pOther.mCopier = nullptr;
+}
+
 template <typename CallableObj>
 FixedFunctionObject(CallableObj&& pObj)
 {
@@ -63,14 +82,20 @@ private:
             ((CallableObjType*)pObj)->~CallableObjType();
         };
 
+        mCopier = [](void* pObj, const void* pOther)
+        {
+            new (pObj) CallableObjType(*(const CallableObjType*)pOther);
+        };
+
         mFn = [](void* pObj, Args&&... pArgs) -> ReturnType
         {
             return (*((CallableObjType*)pObj))(std::forward<Args>(pArgs)...);
         };
     }
-    uint8_t mObject[64];
+    uint8_t mObject[N];
     ReturnType (*mFn)(void*, Args&&...) = nullptr;
     void (*mDestroyer)(void*) = nullptr;
+    void (*mCopier)(void*, const void*) = nullptr;
 };
 
 template <std::size_t N, typename T> struct FixedFunctionObjectTypeHelper;
