@@ -1,11 +1,12 @@
-#ifndef __CLIT_HPP__
-#define __CLIT_HPP__
+#ifndef __COMMANDMANAGER_HPP__
+#define __COMMANDMANAGER_HPP__
 
 #include <map>
 #include <regex>
 #include <optional>
 #include <iostream>
 #include <string_view>
+
 #include <BFC/FixedFunctionObject.hpp>
 
 namespace bfc
@@ -94,4 +95,4 @@ private:
 
 } // namespace bfc
 
-#endif // __CLIT_HPP__
+#endif // __COMMANDMANAGER_HPP__

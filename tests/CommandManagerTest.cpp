@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+
 #include <BFC/CommandManager.hpp>
 
 using namespace bfc;

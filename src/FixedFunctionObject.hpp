@@ -1,5 +1,5 @@
-#ifndef __LIGHTFN_HPP__
-#define __LIGHTFN_HPP__
+#ifndef __FIXEDFUNCTIONOBJECT_HPP__
+#define __FIXEDFUNCTIONOBJECT_HPP__
 
 #include <cstddef>
 #include <cstring>
@@ -73,6 +73,11 @@ FixedFunctionObject& operator=(CallableObj&& pObj)
     reset();
 }
 
+operator bool()
+{
+    return mFn;
+}
+
 void reset()
 {
     if (mDestroyer)
@@ -141,4 +146,4 @@ using LightFunctionObject = typename FixedFunctionObjectTypeHelper<32, FnType>::
 
 } // namespace bfc
 
-#endif // __LIGHTFN_HPP__
+#endif // __FIXEDFUNCTIONOBJECT_HPP__

@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+
 #include <BFC/FixedFunctionObject.hpp>
 
 using namespace bfc;

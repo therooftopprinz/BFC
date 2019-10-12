@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+
 #include <BFC/Buffer.hpp>
 
 using namespace bfc;

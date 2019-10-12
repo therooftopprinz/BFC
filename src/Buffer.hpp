@@ -3,6 +3,8 @@
 
 #include <type_traits>
 
+#include <BFC/FixedFunctionObject.hpp>
+
 namespace bfc
 {
 
@@ -12,9 +14,10 @@ class BufferImpl
     static_assert(sizeof(T)==1);
 public:
     template <typename U>
-    BufferImpl(U* pData, size_t pSize)
+    BufferImpl(U* pData, size_t pSize, LightFunctionObject<void(T*)> pDeleter = [](T* pPtr){delete[] (T*)pPtr;})
         : mSize(pSize)
         , mData(pData)
+        , mDeleter(pDeleter)
     {
         static_assert(sizeof(U)==1);
     }
@@ -27,7 +30,6 @@ public:
     BufferImpl() = default;
     BufferImpl(const BufferImpl&) = delete;
     void operator=(const BufferImpl&) = delete;
-
 
     BufferImpl(BufferImpl&& pOther) noexcept
     {
@@ -55,7 +57,9 @@ public:
     void reset() noexcept
     {
         if (mData)
-            delete[] mData;
+        {
+            mDeleter(mData);
+        }
         clear(std::move(*this));
     }
 
@@ -64,17 +68,20 @@ private:
     {
         pOther.mData = nullptr;
         pOther.mSize = 0;
+        pOther.mDeleter = nullptr;
     }
 
     void transferOwnership(BufferImpl&& pOther) noexcept
     {
         mData = pOther.mData;
         mSize = pOther.mSize;
+        mDeleter = std::move(pOther.mDeleter);
         clear(std::move(pOther));
     };
 
     size_t mSize = 0;
     T* mData = nullptr;
+    std::function<void(T*)>  mDeleter;
 };
 
 using Buffer = BufferImpl<std::byte>;
