@@ -109,3 +109,16 @@ TEST(FixedFunctionObject, ShouldThrowUnset)
     LightFunctionObject<void()> fn;
     EXPECT_THROW(fn(), std::bad_function_call);
 }
+
+TEST(FixedFunctionObject, ShouldSetEqNullptr)
+{
+    LightFunctionObject<void()> fn{TestClass()};
+    fn = nullptr;
+    EXPECT_THROW(fn(), std::bad_function_call);
+}
+
+TEST(FixedFunctionObject, ShouldConstructNullptr)
+{
+    LightFunctionObject<void()> fn{nullptr};
+    EXPECT_THROW(fn(), std::bad_function_call);
+}

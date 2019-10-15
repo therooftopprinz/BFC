@@ -17,7 +17,7 @@ public:
     BufferImpl(U* pData, size_t pSize, LightFunctionObject<void(T*)> pDeleter = [](T* pPtr){delete[] (T*)pPtr;})
         : mSize(pSize)
         , mData(pData)
-        , mDeleter(pDeleter)
+        , mDeleter(std::move(pDeleter))
     {
         static_assert(sizeof(U)==1);
     }
@@ -58,7 +58,7 @@ public:
     {
         if (mData)
         {
-            mDeleter(mData);
+            mDeleter((T*)mData);
         }
         clear(std::move(*this));
     }
@@ -81,7 +81,7 @@ private:
 
     size_t mSize = 0;
     T* mData = nullptr;
-    std::function<void(T*)>  mDeleter;
+    LightFunctionObject<void(T*)>  mDeleter;
 };
 
 using Buffer = BufferImpl<std::byte>;

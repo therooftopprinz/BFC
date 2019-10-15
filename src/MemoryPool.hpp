@@ -12,6 +12,7 @@
 namespace bfc
 {
 
+// TODO: Allocation alignment on pool
 class SizedMemoryPool
 {
 public:
@@ -26,7 +27,6 @@ public:
             delete[] (uint8_t*)i;
         }
     }
-
     Buffer allocate()
     {
         std::byte* rv;

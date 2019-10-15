@@ -36,7 +36,7 @@ FixedFunctionObject(FixedFunctionObject&& pOther)
 {
     std::memcpy(mObject, pOther.mObject, N);
     set(pOther);
-    pOther.mDestroyer = nullptr;
+    pOther.clear();
 }
 
 template <typename CallableObj, std::enable_if_t<!std::is_same_v<std::remove_reference_t<CallableObj>, FixedFunctionObject>>* p = nullptr>
@@ -57,7 +57,8 @@ FixedFunctionObject& operator=(FixedFunctionObject&& pOther)
     reset();
     std::memcpy(mObject, pOther.mObject, N);
     set(pOther);
-    pOther.mDestroyer = nullptr;
+    pOther.clear();
+    return *this;
 }
 
 template <typename CallableObj>
@@ -83,8 +84,8 @@ void reset()
     if (mDestroyer)
     {
         mDestroyer(mObject);
-        mDestroyer = nullptr;
     }
+    clear();
 }
 
 ReturnType operator()(Args&&... pArgs)
@@ -127,6 +128,18 @@ private:
         mFn = pOther.mFn;
         mDestroyer = pOther.mDestroyer;
         mCopier = pOther.mCopier;
+    }
+
+    void set(const std::nullptr_t)
+    {
+        clear();
+    }
+
+    void clear()
+    {
+        mFn = nullptr;
+        mDestroyer = nullptr;
+        mCopier = nullptr;
     }
 
     uint8_t mObject[N];
