@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include <BFC/FixedFunctionObject.hpp>
+#include <bfc/FixedFunctionObject.hpp>
 
 using namespace bfc;
 

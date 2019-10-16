@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include <BFC/Buffer.hpp>
+#include <bfc/Buffer.hpp>
 
 using namespace bfc;
 

@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include <BFC/MemoryPool.hpp>
+#include <bfc/MemoryPool.hpp>
 
 using namespace bfc;
 

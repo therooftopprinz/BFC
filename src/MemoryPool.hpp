@@ -6,8 +6,8 @@
 #include <cmath>
 #include <vector>
 
-#include <BFC/FixedFunctionObject.hpp>
-#include <BFC/Buffer.hpp>
+#include <bfc/FixedFunctionObject.hpp>
+#include <bfc/Buffer.hpp>
 
 namespace bfc
 {

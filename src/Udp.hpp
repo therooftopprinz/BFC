@@ -6,7 +6,7 @@
 #include <unistd.h>
 #include <memory>
 
-#include <BFC/Buffer.hpp>
+#include <bfc/Buffer.hpp>
 
 namespace bfc
 {

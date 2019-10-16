@@ -3,7 +3,7 @@
 
 #include <type_traits>
 
-#include <BFC/FixedFunctionObject.hpp>
+#include <bfc/FixedFunctionObject.hpp>
 
 namespace bfc
 {
