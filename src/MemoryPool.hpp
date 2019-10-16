@@ -5,6 +5,7 @@
 #include <array>
 #include <cmath>
 #include <vector>
+#include <cstddef>
 
 #include <bfc/FixedFunctionObject.hpp>
 #include <bfc/Buffer.hpp>
@@ -12,7 +13,7 @@
 namespace bfc
 {
 
-// TODO: Allocation alignment on pool
+template <std::size_t ALIGNMENT=alignof(std::max_align_t)>
 class SizedMemoryPool
 {
 public:
@@ -24,7 +25,7 @@ public:
     {
         for (auto i : mAllocations)
         {
-            delete[] (uint8_t*)i;
+            operator delete[](i, ALIGNMENT);
         }
     }
     Buffer allocate()
@@ -38,7 +39,7 @@ public:
         }
         else
         {
-            rv = new std::byte[mSize];
+            rv = (std::byte*) operator new[](mSize, ALIGNMENT);
         }
         return Buffer(rv, mSize, [this](std::byte* pPtr){free(pPtr);});
     }
@@ -61,6 +62,7 @@ private:
     std::mutex mAllocationMutex;
 };
 
+template <std::size_t ALIGNMENT=alignof(std::max_align_t)>
 class Log2MemoryPool
 {
 public:
@@ -75,18 +77,19 @@ public:
     }
 
 private:
+    using Pool = SizedMemoryPool<ALIGNMENT>;
     std::array<SizedMemoryPool,11> mPools = {
-        SizedMemoryPool(16),
-        SizedMemoryPool(32),
-        SizedMemoryPool(64),
-        SizedMemoryPool(128),
-        SizedMemoryPool(256),
-        SizedMemoryPool(512),
-        SizedMemoryPool(1024),
-        SizedMemoryPool(2048),
-        SizedMemoryPool(4096),
-        SizedMemoryPool(8192),
-        SizedMemoryPool(16384)
+        Pool(16),
+        Pool(32),
+        Pool(64),
+        Pool(128),
+        Pool(256),
+        Pool(512),
+        Pool(1024),
+        Pool(2048),
+        Pool(4096),
+        Pool(8192),
+        Pool(16384)
     };
 };
 
