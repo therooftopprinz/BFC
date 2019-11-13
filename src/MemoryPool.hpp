@@ -28,6 +28,7 @@ public:
             operator delete[](i, std::align_val_t {ALIGNMENT});
         }
     }
+
     Buffer allocate()
     {
         std::byte* rv;
@@ -36,6 +37,7 @@ public:
         {
             rv = mAllocations.back();
             mAllocations.pop_back();
+            lg.unlock();
         }
         else
         {
@@ -55,7 +57,6 @@ private:
         std::unique_lock<std::mutex> lg(mAllocationMutex);
         mAllocations.emplace_back(pPtr);
     }
-
 
     const std::size_t mSize;
     std::vector<std::byte*> mAllocations;

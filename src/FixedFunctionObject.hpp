@@ -74,7 +74,7 @@ FixedFunctionObject& operator=(CallableObj&& pObj)
     reset();
 }
 
-operator bool()
+operator bool() const
 {
     return mFn;
 }
@@ -88,7 +88,7 @@ void reset()
     clear();
 }
 
-ReturnType operator()(Args&&... pArgs)
+ReturnType operator()(Args&&... pArgs) const
 {
     if (mFn)
     {
@@ -142,7 +142,7 @@ private:
         mCopier = nullptr;
     }
 
-    uint8_t mObject[N];
+    mutable uint8_t mObject[N];
     ReturnType (*mFn)(void*, Args&&...) = nullptr;
     void (*mDestroyer)(void*) = nullptr;
     void (*mCopier)(void*, const void*) = nullptr;
@@ -155,7 +155,7 @@ template <std::size_t N, typename ReturnType, typename... ArgsType> struct Fixed
 };
 
 template <typename FnType>
-using LightFunctionObject = typename FixedFunctionObjectTypeHelper<32, FnType>::type;
+using LightFunctionObject = typename FixedFunctionObjectTypeHelper<24, FnType>::type;
 
 } // namespace bfc
 
