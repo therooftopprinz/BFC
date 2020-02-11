@@ -5,18 +5,6 @@
 #include <cstring>
 #include <functional>
 
-#include <iostream>
-template <typename>
-void ptype()
-{
-    std::cout << __PRETTY_FUNCTION__ << "\n";
-}
-template <typename T, T v>
-void pval()
-{
-    std::cout << __PRETTY_FUNCTION__ << "\n";
-}
-
 namespace bfc
 {
 
@@ -34,7 +22,7 @@ FixedFunctionObject(const FixedFunctionObject& pOther)
 
 FixedFunctionObject(FixedFunctionObject&& pOther)
 {
-    std::memcpy(mObject, pOther.mObject, N);
+    pOther.mMover(mObject, pOther.mObject);
     set(pOther);
     pOther.clear();
 }
@@ -55,7 +43,7 @@ FixedFunctionObject& operator=(const FixedFunctionObject& pOther)
 FixedFunctionObject& operator=(FixedFunctionObject&& pOther)
 {
     reset();
-    std::memcpy(mObject, pOther.mObject, N);
+    pOther.mMover(mObject, pOther.mObject);
     set(pOther);
     pOther.clear();
     return *this;
@@ -117,7 +105,12 @@ private:
             new (pObj) CallableObjType(*(const CallableObjType*)pOther);
         };
 
-        mFn = [](void* pObj, Args&&... pArgs) -> ReturnType
+        mMover = [](void* pObj, void* pOther)
+        {
+            new (pObj) CallableObjType(std::move(*(CallableObjType*)pOther));
+        };
+
+        mFn = [](const void* pObj, Args&&... pArgs) -> ReturnType
         {
             return (*((CallableObjType*)pObj))(std::forward<Args>(pArgs)...);
         };
@@ -128,6 +121,7 @@ private:
         mFn = pOther.mFn;
         mDestroyer = pOther.mDestroyer;
         mCopier = pOther.mCopier;
+        mMover = pOther.mMover;
     }
 
     void set(const std::nullptr_t)
@@ -138,14 +132,13 @@ private:
     void clear()
     {
         mFn = nullptr;
-        mDestroyer = nullptr;
-        mCopier = nullptr;
     }
 
-    mutable uint8_t mObject[N];
-    ReturnType (*mFn)(void*, Args&&...) = nullptr;
+    uint8_t mObject[N];
+    ReturnType (*mFn)(const void*, Args&&...) = nullptr;
     void (*mDestroyer)(void*) = nullptr;
     void (*mCopier)(void*, const void*) = nullptr;
+    void (*mMover)(void*, void*) = nullptr;
 };
 
 template <std::size_t N, typename T> struct FixedFunctionObjectTypeHelper;
@@ -154,8 +147,9 @@ template <std::size_t N, typename ReturnType, typename... ArgsType> struct Fixed
     using type = FixedFunctionObject<N, ReturnType, ArgsType...>;
 };
 
-template <typename FnType>
-using LightFunctionObject = typename FixedFunctionObjectTypeHelper<24, FnType>::type;
+template <typename FnType> using UltraLightFunctionObject = typename FixedFunctionObjectTypeHelper<8, FnType>::type;
+template <typename FnType> using LightFunctionObject = typename FixedFunctionObjectTypeHelper<24, FnType>::type;
+template <typename FnType> using HeavyFunctionObject = typename FixedFunctionObjectTypeHelper<32, FnType>::type;
 
 } // namespace bfc
 

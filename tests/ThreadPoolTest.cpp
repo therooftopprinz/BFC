@@ -7,29 +7,28 @@ using namespace bfc;
 
 TEST(ThreadPool, ShouldExecute)
 {
-    ThreadPool pool;
+    using TP = ThreadPool<LightFunctionObject<void()>>;
+    TP pool;
 
-    std::promise<int> res1;
-    std::promise<int> res2;
-    std::promise<int> res3;
-    std::promise<int> res4;
-    std::promise<int> res5;
+    constexpr int COUNT = 50;
+    std::vector<std::promise<int>> res(COUNT);
+    std::vector<TP::Functor> exec;
 
-    ThreadPool::Functor exec1 = [&res1](){res1.set_value(42);};
-    ThreadPool::Functor exec2 = [&res2](){res2.set_value(43);};
-    ThreadPool::Functor exec3 = [&res3](){res3.set_value(44);};
-    ThreadPool::Functor exec4 = [&res4](){res4.set_value(45);};
-    ThreadPool::Functor exec5 = [&res5](){res5.set_value(46);};
+    for (int i=0u; i<COUNT; i++)
+    {
+        exec.emplace_back([&res, i](){res[i].set_value(i);});
+    }
 
-    pool.execute(exec1);
-    pool.execute(exec2);
-    pool.execute(exec3);
-    pool.execute(exec4);
-    pool.execute(exec5);
+    for (auto& i : exec)
+    {
+        pool.execute(i);
+        std::printf("Active %lu\n", pool.countActive());
+    }
 
-    EXPECT_EQ(42, res1.get_future().get());
-    EXPECT_EQ(43, res2.get_future().get());
-    EXPECT_EQ(44, res3.get_future().get());
-    EXPECT_EQ(45, res4.get_future().get());
-    EXPECT_EQ(46, res5.get_future().get());
+    for (int i=0u; i<COUNT; i++)
+    {
+        EXPECT_EQ(i, res[i].get_future().get());
+    }
+    std::printf("Pool size %lu\n", pool.size());
+
 }

@@ -8,27 +8,35 @@ struct TestClass
 {
     static int count;
     static int copy;
+    static int move;
     static int called;
     TestClass()
     {
+        // std::cout << __PRETTY_FUNCTION__ << "\n";
         count++;
     }
     TestClass(const TestClass&)
     {
+        // std::cout << __PRETTY_FUNCTION__ << "\n";
         copy++;
+        count++;
     }
     TestClass(TestClass&&)
     {
+        // std::cout << __PRETTY_FUNCTION__ << "\n";
+        move++;
         count++;
     }
     ~TestClass()
     {
+        // std::cout << __PRETTY_FUNCTION__ << "\n";
         count--;
     }
     static void reset()
     {
         count = 0;
         copy = 0;
+        move = 0;
         called = 0;
     }
 
@@ -49,6 +57,7 @@ struct TestClass
 
 int TestClass::count = 0;
 int TestClass::copy = 0;
+int TestClass::move = 0;
 int TestClass::called = 0;
 
 int increment(int pV)
@@ -103,6 +112,15 @@ TEST(FixedFunctionObject, ShouldCopyConstruct)
     LightFunctionObject<void()> fn2(fn);
     EXPECT_EQ(1, TestClass::copy);
 }
+
+TEST(FixedFunctionObject, ShouldMoveConstruct)
+{
+    TestClass::reset();
+    LightFunctionObject<void()> fn{TestClass()};
+    LightFunctionObject<void()> fn2(std::move(fn));
+    EXPECT_EQ(2, TestClass::move);
+}
+
 
 TEST(FixedFunctionObject, ShouldThrowUnset)
 {

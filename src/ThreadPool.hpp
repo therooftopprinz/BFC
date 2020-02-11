@@ -15,24 +15,25 @@
 namespace bfc
 {
 
+template <typename FunctorType = LightFunctionObject<void()>>
 class ThreadPool
 {
 public:
-    using Functor = LightFunctionObject<void()>;
+    using Functor = FunctorType;
     ~ThreadPool()
     {
+        mIsRunning = false;
         for (auto& i : mPool)
         {
-            i->isRunning = false;
             i->threadCv.notify_one();
             i->thread.join();
         }
     }
     void execute(const Functor& pFunctor)
     {
-        std::unique_lock<std::mutex> lg(mPoolMutex);
         std::size_t useIndex; 
 
+        std::unique_lock<std::mutex> lg(mFreeListMutex);
         if (mFreeList.size())
         {
             useIndex = mFreeList.back();
@@ -41,51 +42,58 @@ public:
         else
         {
             mPool.emplace_back(std::make_unique<ThreadEntry>());
+            auto& entry = *(mPool.back());
             useIndex = mPool.size()-1;
-            mPool[useIndex]->thread = std::thread([this, useIndex]() {
-                run(useIndex);
+            mPool[useIndex]->thread = std::thread([this, useIndex, &entry]()
+            {
+                auto pred = [&]() {return entry.functor || !mIsRunning;};
+                while(true)
+                {
+                    std::unique_lock<std::mutex> lg(entry.entryMutex);
+                    entry.threadCv.wait(lg, pred);
+                    if (!mIsRunning)
+                    {
+                        return;
+                    }
+                    if (entry.functor)
+                    {
+                        (*(entry.functor))();
+                        entry.functor = nullptr;
+                        std::unique_lock<std::mutex> lg(mFreeListMutex);
+                        mFreeList.emplace_back(useIndex);
+                    }
+                }
             });
         }
 
         auto& threadEntry = *mPool[useIndex];
         threadEntry.functor = &pFunctor;
         threadEntry.threadCv.notify_one();
-    } 
+    }
+
+    std::size_t countActive() const
+    {
+        std::unique_lock<std::mutex> lg(mFreeListMutex);
+        return mPool.size() - mFreeList.size();
+    }
+
+    std::size_t size() const
+    {
+        return mPool.size();
+    }
 private:
     struct ThreadEntry
     {
         const Functor* functor;
         std::thread thread;
         std::condition_variable threadCv;
-        bool isRunning = true;
         std::mutex entryMutex;
     };
 
-    void run(std::size_t pUseIndex)
-    {
-        auto& entry = *mPool[pUseIndex]; 
-        auto pred = [&]() {return entry.functor || !entry.isRunning;};
-        while(true)
-        {
-            std::unique_lock<std::mutex> lg(entry.entryMutex);
-            entry.threadCv.wait(lg, pred);
-            if (!entry.isRunning)
-            {
-                return;
-            }
-            if (entry.functor)
-            {
-                (*(entry.functor))();
-                entry.functor = nullptr;
-                std::unique_lock<std::mutex> lg(mPoolMutex);
-                mFreeList.emplace_back(pUseIndex);
-            }
-        }
-    }
-
+    bool mIsRunning = true;
     std::vector<std::unique_ptr<ThreadEntry>> mPool;
     std::vector<std::size_t> mFreeList;
-    std::mutex mPoolMutex;
+    mutable std::mutex mFreeListMutex;
 };
 
 } // namespace bfc
