@@ -38,23 +38,27 @@ public:
         {
             useIndex = mFreeList.back();
             mFreeList.pop_back();
+            auto& entry = *mPool[useIndex];
+
+            std::unique_lock<std::mutex> lg(entry.entryMutex);
+            entry.functor = &pFunctor;
+            entry.threadCv.notify_one();
         }
         else
         {
             mPool.emplace_back(std::make_unique<ThreadEntry>());
             auto& entry = *(mPool.back());
             useIndex = mPool.size()-1;
+
+            entry.functor = &pFunctor;
+
             mPool[useIndex]->thread = std::thread([this, useIndex, &entry]()
             {
                 auto pred = [&]() {return entry.functor || !mIsRunning;};
                 while(true)
                 {
                     std::unique_lock<std::mutex> lg(entry.entryMutex);
-                    entry.threadCv.wait(lg, pred);
-                    if (!mIsRunning)
-                    {
-                        return;
-                    }
+
                     if (entry.functor)
                     {
                         (*(entry.functor))();
@@ -62,13 +66,16 @@ public:
                         std::unique_lock<std::mutex> lg(mFreeListMutex);
                         mFreeList.emplace_back(useIndex);
                     }
+
+                    if (!mIsRunning)
+                    {
+                        return;
+                    }
+
+                    entry.threadCv.wait(lg, pred);
                 }
             });
         }
-
-        auto& threadEntry = *mPool[useIndex];
-        threadEntry.functor = &pFunctor;
-        threadEntry.threadCv.notify_one();
     }
 
     std::size_t countActive() const

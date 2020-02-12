@@ -16,13 +16,21 @@ FixedFunctionObject() = default;
 
 FixedFunctionObject(const FixedFunctionObject& pOther)
 {
-    pOther.mCopier(mObject, pOther.mObject);
+    if (pOther)
+    {
+        pOther.mCopier(mObject, pOther.mObject);
+    }
+
     set(pOther);
 }
 
 FixedFunctionObject(FixedFunctionObject&& pOther)
 {
-    pOther.mMover(mObject, pOther.mObject);
+    if (pOther)
+    {
+        pOther.mMover(mObject, pOther.mObject);
+    }
+
     set(pOther);
     pOther.clear();
 }
@@ -36,14 +44,24 @@ FixedFunctionObject(CallableObj&& pObj)
 FixedFunctionObject& operator=(const FixedFunctionObject& pOther)
 {
     reset();
-    pOther.mCopier(mObject, pOther.mObject);
+
+    if (pOther)
+    {
+        pOther.mCopier(mObject, pOther.mObject);
+    }
+
     set(pOther);
 }
 
 FixedFunctionObject& operator=(FixedFunctionObject&& pOther)
 {
     reset();
-    pOther.mMover(mObject, pOther.mObject);
+
+    if (pOther)
+    {
+        pOther.mMover(mObject, pOther.mObject);
+    }
+
     set(pOther);
     pOther.clear();
     return *this;
@@ -69,10 +87,11 @@ operator bool() const
 
 void reset()
 {
-    if (mDestroyer)
+    if (mFn)
     {
         mDestroyer(mObject);
     }
+
     clear();
 }
 

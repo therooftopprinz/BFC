@@ -140,3 +140,23 @@ TEST(FixedFunctionObject, ShouldConstructNullptr)
     LightFunctionObject<void()> fn{nullptr};
     EXPECT_THROW(fn(), std::bad_function_call);
 }
+
+TEST(FixedFunctionObject, ShouldCopyConstructAndAssignFromEmpty)
+{
+    LightFunctionObject<void()> fn;
+    LightFunctionObject<void()> fn2(fn);
+    LightFunctionObject<void()> fn3;
+    fn3 = fn;
+    EXPECT_THROW(fn2(), std::bad_function_call);
+    EXPECT_THROW(fn3(), std::bad_function_call);
+}
+
+TEST(FixedFunctionObject, ShouldMoveConstructAndAssignFromEmpty)
+{
+    LightFunctionObject<void()> fn;
+    LightFunctionObject<void()> fn2(std::move(fn));
+    LightFunctionObject<void()> fn3;
+    fn = std::move(fn2);
+    EXPECT_THROW(fn2(), std::bad_function_call);
+    EXPECT_THROW(fn3(), std::bad_function_call);
+}
