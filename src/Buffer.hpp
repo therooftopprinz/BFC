@@ -14,7 +14,7 @@ class BufferImpl
     static_assert(sizeof(T)==1);
 public:
     template <typename U>
-    BufferImpl(U* pData, size_t pSize, LightFunctionObject<void(T*)> pDeleter = [](T* pPtr){delete[] (T*)pPtr;})
+    BufferImpl(U* pData, size_t pSize, LightFn<void(T*)> pDeleter = [](T* pPtr){delete[] (T*)pPtr;})
         : mSize(pSize)
         , mData(pData)
         , mDeleter(std::move(pDeleter))
@@ -81,7 +81,7 @@ private:
 
     size_t mSize = 0;
     T* mData = nullptr;
-    LightFunctionObject<void(T*)>  mDeleter;
+    LightFn<void(T*)>  mDeleter;
 };
 
 using Buffer = BufferImpl<std::byte>;

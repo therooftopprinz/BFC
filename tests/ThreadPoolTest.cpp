@@ -7,7 +7,7 @@ using namespace bfc;
 
 TEST(ThreadPool, ShouldExecute)
 {
-    using TP = ThreadPool<LightFunctionObject<void()>>;
+    using TP = ThreadPool<LightFn<void()>>;
     TP pool;
 
     constexpr int COUNT = 50;

@@ -15,7 +15,7 @@
 namespace bfc
 {
 
-template <typename FunctorType = LightFunctionObject<void()>>
+template <typename FunctorType = LightFn<void()>>
 class ThreadPool
 {
 public:

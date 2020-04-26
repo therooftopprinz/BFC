@@ -166,9 +166,9 @@ template <std::size_t N, typename ReturnType, typename... ArgsType> struct Fixed
     using type = FixedFunctionObject<N, ReturnType, ArgsType...>;
 };
 
-template <typename FnType> using UltraLightFunctionObject = typename FixedFunctionObjectTypeHelper<8, FnType>::type;
-template <typename FnType> using LightFunctionObject = typename FixedFunctionObjectTypeHelper<24, FnType>::type;
-template <typename FnType> using HeavyFunctionObject = typename FixedFunctionObjectTypeHelper<32, FnType>::type;
+template <typename FnType> using UltraLightFn = typename FixedFunctionObjectTypeHelper<8, FnType>::type;
+template <typename FnType> using LightFn = typename FixedFunctionObjectTypeHelper<24, FnType>::type;
+template <typename FnType> using HeavyFn = typename FixedFunctionObjectTypeHelper<32, FnType>::type;
 
 } // namespace bfc
 

@@ -43,7 +43,7 @@ public:
 class CommandManager
 {
 public:
-    using CmdFnCb = LightFunctionObject<std::string(ArgsMap&&)>;
+    using CmdFnCb = LightFn<std::string(ArgsMap&&)>;
     void addCommand(const std::string_view& pCmd, const CmdFnCb& pCallback)
     {
         mCmds.emplace(pCmd, pCallback);
