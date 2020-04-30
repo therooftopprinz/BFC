@@ -160,3 +160,14 @@ TEST(FixedFunctionObject, ShouldMoveConstructAndAssignFromEmpty)
     EXPECT_THROW(fn2(), std::bad_function_call);
     EXPECT_THROW(fn3(), std::bad_function_call);
 }
+
+TEST(FixedFunctionObject, ShouldAssignFromStaticMember)
+{
+    LightFn<void()> fn = &TestClass::reset;
+
+    TestClass::count = 1;
+
+    fn();
+
+    EXPECT_EQ(0, TestClass::count);
+}
