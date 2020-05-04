@@ -38,6 +38,7 @@ public:
         {
             useIndex = mFreeList.back();
             mFreeList.pop_back();
+            std::unique_lock<std::mutex> lgPool(mPoolMutex);
             auto& entry = *mPool[useIndex];
 
             std::unique_lock<std::mutex> lg(entry.entryMutex);
@@ -46,6 +47,7 @@ public:
         }
         else
         {
+            std::unique_lock<std::mutex> lg(mPoolMutex);
             mPool.emplace_back(std::make_unique<ThreadEntry>());
             auto& entry = *(mPool.back());
             useIndex = mPool.size()-1;
@@ -86,6 +88,7 @@ public:
 
     std::size_t size() const
     {
+        std::unique_lock<std::mutex> lg(mPoolMutex);
         return mPool.size();
     }
 private:
@@ -99,6 +102,7 @@ private:
 
     bool mIsRunning = true;
     std::vector<std::unique_ptr<ThreadEntry>> mPool;
+    mutable std::mutex mPoolMutex;
     std::vector<std::size_t> mFreeList;
     mutable std::mutex mFreeListMutex;
 };
