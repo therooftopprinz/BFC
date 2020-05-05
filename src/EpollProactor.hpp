@@ -161,4 +161,4 @@ private:
 
 } // namespace bfc
 
-#endif // __MEMORYPOOL_HPP__
+#endif // __EPOLLPROACTOR_HPP__
