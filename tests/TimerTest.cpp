@@ -22,11 +22,36 @@ struct TimerTest : Test
 
     void TearDown()
     {
+        sut.stop();
         runner.join();
     }
+
+    void stopTest()
+    {
+        std::unique_lock<std::mutex> lg(endOfTestMutex);
+        endOfTest = true;
+        endOfTesCv.notify_one();
+    }
+
+    void waitTest()
+    {
+        std::unique_lock<std::mutex> lg(endOfTestMutex);
+        endOfTesCv.wait(lg, [this](){return endOfTest;});
+    }
+
     Timer<> sut;
     std::thread runner;
     SequenceChecker checker;
+
+    std::vector<int> checker2;
+    std::mutex checker2mutex;
+
+    bool endOfTest = false;
+    std::mutex endOfTestMutex;
+    std::condition_variable endOfTesCv;
+
+    static constexpr uint64_t FACTOR = 1000*1000;
+    
 };
 
 TEST_F(TimerTest, shouldSchedule)
@@ -40,44 +65,52 @@ TEST_F(TimerTest, shouldScheduleEarlier)
     EXPECT_CALL(checker, check(1));
     EXPECT_CALL(checker, check(20));
 
-    sut.schedule(std::chrono::nanoseconds(1000*1000*20), [this]()
+    sut.schedule(std::chrono::nanoseconds(FACTOR*20), [this]()
         {
             checker.check(20);
-            sut.stop();
+            stopTest();
         });
-    sut.schedule(std::chrono::nanoseconds(1000*1000*1), [this]()
+    sut.schedule(std::chrono::nanoseconds(FACTOR*1), [this]()
         {
             checker.check(1);
         });
+    waitTest();
 }
 
 TEST_F(TimerTest, shouldCancel)
 {
-    InSequence seq;
-    EXPECT_CALL(checker, check(20));
-    EXPECT_CALL(checker, check(30));
-    // EXPECT_CALL(checker, check(40));
-    EXPECT_CALL(checker, check(50));
+    constexpr uint64_t BASE = FACTOR*1;
+    std::vector<int> expectedSequence;
 
-    sut.schedule(std::chrono::nanoseconds(1000*1000*50), [this]()
+    for (int i = 0; i<50; i++)
+    {
+        if (0 != i%5 || 0 == i%10 || i == 0)
         {
-            checker.check(50);
-            sut.stop();
-        });
+            expectedSequence.emplace_back(i);
+        }
 
-    sut.schedule(std::chrono::nanoseconds(1000*1000*40), [this]()
-        {
-            checker.check(40);
-        });
+        // std::cout << "SCHEDULE " << i << "\n";
+        sut.schedule(std::chrono::nanoseconds(BASE + FACTOR*i), [this, i]()
+            {
+                // std::cout << "RUN " << i << "\n";
+                {
+                    std::unique_lock<std::mutex> lg(checker2mutex);
+                    checker2.emplace_back(i);
+                }
+                if (0 == i%10)
+                {
+                    auto id = i + 5;
+                    sut.cancel(id);
+                    // std::cout << "TRY CANCEL " << id << "\n";
+                }
+                if (i==49)
+                {
+                    stopTest();
+                }
+            });
+    }
 
-    sut.schedule(std::chrono::nanoseconds(1000*1000*30), [this]()
-        {
-            checker.check(30);
-        });
+    waitTest();
 
-    sut.schedule(std::chrono::nanoseconds(1000*1000*20), [this]()
-        {
-            checker.check(20);
-            sut.cancel(1);
-        });
+    EXPECT_THAT(checker2, ElementsAreArray(expectedSequence));
 }
