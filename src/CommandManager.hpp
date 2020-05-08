@@ -44,10 +44,13 @@ class CommandManager
 {
 public:
     using CmdFnCb = LightFn<std::string(ArgsMap&&)>;
-    void addCommand(const std::string_view& pCmd, const CmdFnCb& pCallback)
+
+    template <typename Cb>
+    void addCommand(const std::string_view& pCmd, Cb&& pCallback)
     {
-        mCmds.emplace(pCmd, pCallback);
+        mCmds.emplace(pCmd, std::forward<Cb>(pCallback));
     }
+
     void removeCommand(const std::string_view& pCmd)
     {
         mCmds.erase(pCmd.data());

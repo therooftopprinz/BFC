@@ -1,5 +1,5 @@
-#ifndef __EPOLLPROACTOR_HPP__
-#define __EPOLLPROACTOR_HPP__
+#ifndef __EpollReactor_HPP__
+#define __EpollReactor_HPP__
 
 #include <mutex>
 
@@ -8,21 +8,20 @@
 #include <sys/unistd.h>
 
 #include <bfc/FixedFunctionObject.hpp>
-#include <bfc/ThreadPool.hpp>
 
 namespace bfc
 {
 
-class EpollProactor
+class EpollReactor
 {
 public:
 
-    using Callback = LightFn<void(int)>;
+    using Callback = LightFn<void()>;
 
-    EpollProactor(const EpollProactor&) = delete;
-    void operator=(const EpollProactor&) = delete;
+    EpollReactor(const EpollReactor&) = delete;
+    void operator=(const EpollReactor&) = delete;
 
-    EpollProactor()
+    EpollReactor()
         : mEpollFd(epoll_create1(0))
     {
         if (-1 == mEpollFd)
@@ -44,7 +43,7 @@ public:
             });
     }
 
-    ~EpollProactor()
+    ~EpollReactor()
     {
         stop();
         close(mEventFd);
@@ -70,10 +69,13 @@ public:
         mRunning = true;
         while (mRunning)
         {
+            processCallbackToAdd();
+            processCallbackToRemove();
+
             auto nfds = epoll_wait(mEpollFd, mEventCache.data(), mEventCache.size(), -1);
             if (-1 == nfds)
             {
-                if (EINTR == errno)
+                if (EINTR != errno)
                 {
                     throw std::runtime_error(strerror(errno));
                 }
@@ -82,11 +84,8 @@ public:
 
             for (int i=0; i<nfds; i++)
             {
-                mTp.execute(mCallbackMap.at(mEventCache[i].data.fd));
+                mCallbackMap.at(mEventCache[i].data.fd)();
             }
-
-            processCallbackToAdd();
-            processCallbackToRemove();
         }
     }
 
@@ -105,7 +104,7 @@ private:
         {
             epoll_event event;
             event.data.fd = i.first;
-            event.events = EPOLLIN;
+            event.events = EPOLLIN | EPOLLRDHUP;
 
             if (epoll_ctl(mEpollFd, EPOLL_CTL_ADD, i.first, &event) == -1)
             {
@@ -153,7 +152,6 @@ private:
     std::mutex mCallbackMapToAddMutex;
     std::mutex mCallbackMapToRemoveMutex;
 
-    ThreadPool<> mTp;
     int mEpollFd;
     int mEventFd;
     bool mRunning;
@@ -161,4 +159,4 @@ private:
 
 } // namespace bfc
 
-#endif // __EPOLLPROACTOR_HPP__
+#endif // __EpollReactor_HPP__
