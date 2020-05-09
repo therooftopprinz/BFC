@@ -95,11 +95,12 @@ void reset()
     clear();
 }
 
-ReturnType operator()(Args&&... pArgs) const
+template <typename... T>
+ReturnType operator()(T&&... pArgs) const
 {
     if (mFn)
     {
-        return mFn(mObject, std::forward<Args>(pArgs)...);
+        return mFn(mObject, std::forward<T>(pArgs)...);
     }
     else
     {
@@ -129,7 +130,7 @@ private:
             new (pObj) CallableObjType(std::move(*(CallableObjType*)pOther));
         };
 
-        mFn = [](const void* pObj, Args&&... pArgs) -> ReturnType
+        mFn = [](const void* pObj, Args... pArgs) -> ReturnType
         {
             return (*((CallableObjType*)pObj))(std::forward<Args>(pArgs)...);
         };
@@ -154,7 +155,7 @@ private:
     }
 
     uint8_t mObject[N];
-    ReturnType (*mFn)(const void*, Args&&...) = nullptr;
+    ReturnType (*mFn)(const void*, Args...) = nullptr;
     void (*mDestroyer)(void*) = nullptr;
     void (*mCopier)(void*, const void*) = nullptr;
     void (*mMover)(void*, void*) = nullptr;
