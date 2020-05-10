@@ -22,80 +22,65 @@ public:
 
     int schedule(std::chrono::nanoseconds pDiff, FunctorType pCb)
     {
+        auto tp = std::chrono::high_resolution_clock::now();
         std::unique_lock<std::mutex> lg(mSchedulesMutex);
-        mAddRequest = true;
-        mToAddList.emplace_back(pDiff, ScheduleIdFn(mIdCtr, std::move(pCb)));
         mSchedulesCv.notify_one();
-        return mIdCtr++;
+        auto id = mIdCtr++;
+        auto res = mSchedules.emplace(tp + pDiff, std::pair(id, std::move(pCb)));
+        mScheduleIds.emplace(id, res);
+        mAddRequest = true;
+        lg.unlock();
+        return id;
     }
 
     void cancel(int pId)
     {
-        std::unique_lock<std::mutex> lg(mToCancelListMutex);
-        mCancelRequest = true;
-        mToCancelList.emplace_back(pId);
+        std::unique_lock<std::mutex> lg(mSchedulesMutex);
         mSchedulesCv.notify_one();
+        auto foundIt = mScheduleIds.find(pId);
+        if (mScheduleIds.end() == foundIt)
+        {
+            return;
+        }
+        auto remIt = foundIt->second;
+        mScheduleIds.erase(foundIt);
+        mSchedules.erase(remIt);
+        mCancelRequest = true;
     }
 
     void run()
     {
         mRunning = true;
-        auto waitBreaker = [this](){return mAddRequest|| !mRunning || mCancelRequest;};
+        auto waitBreaker = [this]() {
+                bool hasCancel = mCancelRequest;
+                bool hasAdd = mAddRequest;
+                mCancelRequest = false;
+                mAddRequest = false;
+                return !mRunning || hasCancel || hasAdd;
+            };
+
         while (mRunning)
         {
+            if (mToRun)
+            {
+                mToRun();
+                mToRun.reset();
+            }
+
             std::unique_lock<std::mutex> lg(mSchedulesMutex);
             auto tp = std::chrono::high_resolution_clock::now();
 
-            {
-                std::unique_lock<std::mutex> lg(mToCancelListMutex);
-
-                for (auto i : mToCancelList)
-                {
-                    if (!mScheduleIds.count(i))
-                    {
-                        continue;
-                    }
-
-                    auto it = mScheduleIds.at(i);
-                    mSchedules.erase(it);
-                    mScheduleIds.erase(i);
-                }
-
-                mCancelRequest = false;
-                mToCancelList.clear();
-            }
-            {
-                std::unique_lock<std::mutex> lg(mToAddListMutex);
-                for (auto& i : mToAddList)
-                {
-                    auto tpdiff = tp + i.first;
-                    auto id = i.second.first;
-                    auto res = mSchedules.emplace(tpdiff, std::move(i.second));
-                    mScheduleIds.emplace(id, res);
-                }
-
-                mAddRequest = false;
-                mToAddList.clear();
-            }
-
-            auto res = mSchedules.equal_range(tp);
-
-            for (auto i = mSchedules.begin(); i != mSchedules.end() && i != res.second; i++)
-            {
-                i->second.second();
-                mScheduleIds.erase(i->second.first);
-            }
-
-            mSchedules.erase(mSchedules.begin(), res.second);
-
             if (mSchedules.size())
             {
-                auto next = mSchedules.begin()->first;
-                auto tdiff = next - tp;
+                auto firstIt =  mSchedules.begin();
+                auto nextTime = firstIt->first;
+                mToRun = std::move(firstIt->second.second);
+                auto tdiff = nextTime - tp;
+                mScheduleIds.erase(firstIt->second.first);
+                mSchedules.erase(firstIt);
                 mSchedulesCv.wait_for(lg, tdiff, waitBreaker);
                 continue;
             }
-
             mSchedulesCv.wait(lg, waitBreaker);
         }
     }
@@ -111,19 +96,14 @@ private:
     using ScheduleMap = std::multimap<TimePoint, ScheduleIdFn>;
     ScheduleMap mSchedules;
     std::unordered_map<int, typename ScheduleMap::iterator> mScheduleIds;
-    int  mIdCtr=0;
+    int mIdCtr = 0;
 
-    std::vector<int> mToCancelList;
-    std::mutex mToCancelListMutex;
-
-    std::vector<std::pair<std::chrono::nanoseconds, ScheduleIdFn>> mToAddList;
-    std::mutex mToAddListMutex;
-
+    FunctorType mToRun;
     std::condition_variable mSchedulesCv;
-    std::mutex mSchedulesMutex;
-    bfc::ThreadPool<> mTp;
     bool mCancelRequest;
     bool mAddRequest;
+    std::mutex mSchedulesMutex;
+
     bool mRunning;
 };
 } // namespace bfc

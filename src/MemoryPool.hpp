@@ -31,6 +31,12 @@ public:
 
     Buffer allocate()
     {
+        std::byte* rv = allocate0();
+        return Buffer(rv, mSize, [this](std::byte* pPtr){free(pPtr);});
+    }
+
+    std::byte* allocate0()
+    {
         std::byte* rv;
         std::unique_lock<std::mutex> lg(mAllocationMutex);
         if (mAllocations.size())
@@ -43,7 +49,13 @@ public:
         {
             rv = (std::byte*) operator new[](mSize, std::align_val_t {ALIGNMENT});
         }
-        return Buffer(rv, mSize, [this](std::byte* pPtr){free(pPtr);});
+        return rv;
+    }
+
+    void free(const std::byte* pPtr)
+    {
+        std::unique_lock<std::mutex> lg(mAllocationMutex);
+        mAllocations.emplace_back(const_cast<std::byte*>(pPtr));
     }
 
     std::size_t allocationSize() const
@@ -52,11 +64,6 @@ public:
     }
 
 private:
-    void free(std::byte* pPtr)
-    {
-        std::unique_lock<std::mutex> lg(mAllocationMutex);
-        mAllocations.emplace_back(pPtr);
-    }
 
     const std::size_t mSize;
     std::vector<std::byte*> mAllocations;
@@ -75,6 +82,26 @@ public:
         }
         int index = std::ceil(std::log2(pSize))-4;
         return mPools.at(index).allocate();
+    }
+
+    std::byte* allocate0(std::size_t pSize)
+    {
+        if (pSize<=8)
+        {
+            throw std::bad_alloc();
+        }
+        int index = std::ceil(std::log2(pSize))-4;
+        return mPools.at(index).allocate0();
+    }
+
+    void free(const std::byte* pAlloc, std::size_t pSize)
+    {
+        if (pSize<=8)
+        {
+            throw std::bad_alloc();
+        }
+        int index = std::ceil(std::log2(pSize))-4;
+        return mPools.at(index).free(pAlloc);
     }
 
 private:

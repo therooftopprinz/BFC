@@ -95,7 +95,6 @@ public:
         return true;
     }
 
-
     void run()
     {
         mRunning = true;

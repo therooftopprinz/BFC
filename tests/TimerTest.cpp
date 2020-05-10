@@ -50,7 +50,7 @@ struct TimerTest : Test
     std::mutex endOfTestMutex;
     std::condition_variable endOfTesCv;
 
-    static constexpr uint64_t FACTOR = 1000*1000;
+    static constexpr uint64_t FACTOR = 1000;
     
 };
 
@@ -90,7 +90,7 @@ TEST_F(TimerTest, shouldCancel)
         }
 
         // std::cout << "SCHEDULE " << i << "\n";
-        sut.schedule(std::chrono::nanoseconds(BASE + FACTOR*i), [this, i]()
+        sut.schedule(std::chrono::nanoseconds(BASE + FACTOR*i*1000), [this, i]()
             {
                 // std::cout << "RUN " << i << "\n";
                 {

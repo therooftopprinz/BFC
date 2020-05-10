@@ -29,7 +29,7 @@ public:
             i->thread.join();
         }
     }
-    void execute(const Functor& pFunctor)
+    void execute(Functor pFunctor)
     {
         std::size_t useIndex; 
 
@@ -42,7 +42,7 @@ public:
             auto& entry = *mPool[useIndex];
 
             std::unique_lock<std::mutex> lg(entry.entryMutex);
-            entry.functor = &pFunctor;
+            entry.functor = std::move(pFunctor);
             entry.threadCv.notify_one();
         }
         else
@@ -52,7 +52,8 @@ public:
             auto& entry = *(mPool.back());
             useIndex = mPool.size()-1;
 
-            entry.functor = &pFunctor;
+            // TODO: not working with a std::move calls operator=(FixedFunctionObject&)
+            entry.functor = (Functor&&)pFunctor;
 
             mPool[useIndex]->thread = std::thread([this, useIndex, &entry]()
             {
@@ -63,8 +64,8 @@ public:
 
                     if (entry.functor)
                     {
-                        (*(entry.functor))();
-                        entry.functor = nullptr;
+                        entry.functor();
+                        entry.functor = {};
                         std::unique_lock<std::mutex> lg(mFreeListMutex);
                         mFreeList.emplace_back(useIndex);
                     }
@@ -94,7 +95,7 @@ public:
 private:
     struct ThreadEntry
     {
-        const Functor* functor;
+        Functor functor;
         std::thread thread;
         std::condition_variable threadCv;
         std::mutex entryMutex;
