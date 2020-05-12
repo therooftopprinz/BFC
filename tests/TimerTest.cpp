@@ -63,11 +63,11 @@ TEST_F(TimerTest, shouldScheduleEarlier)
 {
     InSequence seq;
     EXPECT_CALL(checker, check(1));
-    EXPECT_CALL(checker, check(20));
+    EXPECT_CALL(checker, check(200));
 
-    sut.schedule(std::chrono::nanoseconds(FACTOR*20), [this]()
+    sut.schedule(std::chrono::nanoseconds(FACTOR*200), [this]()
         {
-            checker.check(20);
+            checker.check(200);
             stopTest();
         });
     sut.schedule(std::chrono::nanoseconds(FACTOR*1), [this]()
