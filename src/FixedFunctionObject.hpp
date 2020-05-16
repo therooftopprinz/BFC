@@ -51,6 +51,7 @@ FixedFunctionObject& operator=(const FixedFunctionObject& pOther)
     }
 
     set(pOther);
+    return *this;
 }
 
 FixedFunctionObject& operator=(FixedFunctionObject&& pOther)
