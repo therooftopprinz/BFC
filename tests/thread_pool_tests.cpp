@@ -1,18 +1,18 @@
 #include <gtest/gtest.h>
 
-#include <bfc/ThreadPool.hpp>
-#include <bfc/FixedFunctionObject.hpp>
+#include <bfc/thread_pool.hpp>
+#include <bfc/function.hpp>
 
 using namespace bfc;
 
-TEST(ThreadPool, ShouldExecute)
+TEST(thead_pool, ShouldExecute)
 {
-    using TP = ThreadPool<LightFn<void()>>;
+    using TP = thead_pool<light_function<void()>>;
     TP pool;
 
     constexpr int COUNT = 50;
     std::vector<std::promise<int>> res(COUNT);
-    std::vector<TP::Functor> exec;
+    std::vector<TP::fn_t> exec;
 
     for (int i=0u; i<COUNT; i++)
     {
@@ -22,7 +22,7 @@ TEST(ThreadPool, ShouldExecute)
     for (auto& i : exec)
     {
         pool.execute(i);
-        std::printf("Active %lu\n", pool.countActive());
+        std::printf("Active %lu\n", pool.count_active());
     }
 
     for (int i=0u; i<COUNT; i++)

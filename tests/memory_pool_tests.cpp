@@ -1,20 +1,20 @@
 #include <gtest/gtest.h>
 
-#include <bfc/MemoryPool.hpp>
+#include <bfc/memory_pool.hpp>
 
 using namespace bfc;
 
-TEST(SizeMemoryPool, ShouldAllocate)
+TEST(sized_memory_pool, ShouldAllocate)
 {
-    SizedMemoryPool sizedPool(64);
-    Buffer buffer = sizedPool.allocate();
+    sized_memory_pool sp(64);
+    buffer buffer = sp.allocate();
     ASSERT_NE(nullptr, buffer.data());
     ASSERT_EQ(64u, buffer.size());
 }
 
-TEST(Log2MemoryPool, ShouldAllocate)
+TEST(log2_memory_pool, ShouldAllocate)
 {
-    Log2MemoryPool pool;
+    log2_memory_pool pool;
     ASSERT_EQ(16u,     pool.allocate(9).size());
     ASSERT_EQ(32u,     pool.allocate(17).size());
     ASSERT_EQ(64u,     pool.allocate(33).size());

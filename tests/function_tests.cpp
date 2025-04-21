@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include <bfc/FixedFunctionObject.hpp>
+#include <bfc/function.hpp>
 
 using namespace bfc;
 
@@ -68,20 +68,20 @@ int increment(int pV)
 TEST(FixedFunctionObject, ShouldCallMemberFunction)
 {
     TestClass tc;
-    LightFn<int(int)> fn([&tc](int i)->int {return tc.increment(i);});
+    light_function<int(int)> fn([&tc](int i)->int {return tc.increment(i);});
     EXPECT_EQ(42, fn(41));
 }
 
 TEST(FixedFunctionObject, ShouldCallNonMemberFunction)
 {
-    LightFn<int(int)> fn(increment);
+    light_function<int(int)> fn(increment);
     EXPECT_EQ(42, fn(41));
 }
 
 TEST(FixedFunctionObject, ShouldCallMemberFunctionMixedArgs)
 {
     TestClass tc;
-    LightFn<void(int&,int)> fn([&tc](int& a, int b)->void {return tc.add(a,b);});
+    light_function<void(int&,int)> fn([&tc](int& a, int b)->void {return tc.add(a,b);});
     int a = 41;
     fn(a,1);
     EXPECT_EQ(42, a);
@@ -90,7 +90,7 @@ TEST(FixedFunctionObject, ShouldCallMemberFunctionMixedArgs)
 TEST(FixedFunctionObject, ShouldCallCallable)
 {
     TestClass::reset();
-    LightFn<void()> fn{TestClass()};
+    light_function<void()> fn{TestClass()};
     fn();
     EXPECT_EQ(1, TestClass::called);
 }
@@ -99,7 +99,7 @@ TEST(FixedFunctionObject, ShouldCallDestruct)
 {
     TestClass::reset();
     {
-        LightFn<void()> fn{TestClass()};
+        light_function<void()> fn{TestClass()};
         EXPECT_EQ(1, TestClass::count);
     }
     EXPECT_EQ(0, TestClass::count);
@@ -108,44 +108,44 @@ TEST(FixedFunctionObject, ShouldCallDestruct)
 TEST(FixedFunctionObject, ShouldCopyConstruct)
 {
     TestClass::reset();
-    LightFn<void()> fn{TestClass()};
-    LightFn<void()> fn2(fn);
+    light_function<void()> fn{TestClass()};
+    light_function<void()> fn2(fn);
     EXPECT_EQ(1, TestClass::copy);
 }
 
 TEST(FixedFunctionObject, ShouldMoveConstruct)
 {
     TestClass::reset();
-    LightFn<void()> fn{TestClass()};
-    LightFn<void()> fn2(std::move(fn));
+    light_function<void()> fn{TestClass()};
+    light_function<void()> fn2(std::move(fn));
     EXPECT_EQ(2, TestClass::move);
 }
 
 
 TEST(FixedFunctionObject, ShouldThrowUnset)
 {
-    LightFn<void()> fn;
+    light_function<void()> fn;
     EXPECT_THROW(fn(), std::bad_function_call);
 }
 
 TEST(FixedFunctionObject, ShouldSetEqNullptr)
 {
-    LightFn<void()> fn{TestClass()};
+    light_function<void()> fn{TestClass()};
     fn = nullptr;
     EXPECT_THROW(fn(), std::bad_function_call);
 }
 
 TEST(FixedFunctionObject, ShouldConstructNullptr)
 {
-    LightFn<void()> fn{nullptr};
+    light_function<void()> fn{nullptr};
     EXPECT_THROW(fn(), std::bad_function_call);
 }
 
 TEST(FixedFunctionObject, ShouldCopyConstructAndAssignFromEmpty)
 {
-    LightFn<void()> fn;
-    LightFn<void()> fn2(fn);
-    LightFn<void()> fn3;
+    light_function<void()> fn;
+    light_function<void()> fn2(fn);
+    light_function<void()> fn3;
     fn3 = fn;
     EXPECT_THROW(fn2(), std::bad_function_call);
     EXPECT_THROW(fn3(), std::bad_function_call);
@@ -153,9 +153,9 @@ TEST(FixedFunctionObject, ShouldCopyConstructAndAssignFromEmpty)
 
 TEST(FixedFunctionObject, ShouldMoveConstructAndAssignFromEmpty)
 {
-    LightFn<void()> fn;
-    LightFn<void()> fn2(std::move(fn));
-    LightFn<void()> fn3;
+    light_function<void()> fn;
+    light_function<void()> fn2(std::move(fn));
+    light_function<void()> fn3;
     fn = std::move(fn2);
     EXPECT_THROW(fn2(), std::bad_function_call);
     EXPECT_THROW(fn3(), std::bad_function_call);
@@ -163,7 +163,7 @@ TEST(FixedFunctionObject, ShouldMoveConstructAndAssignFromEmpty)
 
 TEST(FixedFunctionObject, ShouldAssignFromStaticMember)
 {
-    LightFn<void()> fn = &TestClass::reset;
+    light_function<void()> fn = &TestClass::reset;
 
     TestClass::count = 1;
 
