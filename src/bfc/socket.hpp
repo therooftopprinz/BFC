@@ -13,15 +13,17 @@
 namespace bfc
 {
 
-
-uint32_t to_ip(uint8_t a, uint8_t b, uint8_t c, uint8_t d)
+constexpr uint32_t to_ip(uint8_t a, uint8_t b, uint8_t c, uint8_t d)
 {
-    uint32_t rv = a;
-    rv << 8; rv |= b;
-    rv << 8; rv |= c;
-    rv << 8; rv |= d;
+    uint32_t 
+    rv =  (uint32_t(a) << 24);
+    rv |= (uint32_t(b) << 16);
+    rv |= (uint32_t(c) << 8);
+    rv |= (uint32_t(d) << 0);
     return rv;
 }
+
+constexpr uint32_t localhost4 = to_ip(127,0,0,1);
 
 sockaddr_in to_ip_port(uint32_t ip, uint16_t port)
 {
@@ -33,14 +35,23 @@ sockaddr_in to_ip_port(uint32_t ip, uint16_t port)
     return addr;
 }
 
+int create_tcp4()
+{
+    return ::socket(AF_INET, SOCK_STREAM, 0);
+}
+
 class socket
 {
 public:
+    socket()
+        : m_fd(-1)
+    {}
+
     socket(int p_fd)
         : m_fd(p_fd)
     {}
 
-    virtual ~socket()
+    ~socket()
     {
         if (-1 != m_fd)
         {
@@ -75,6 +86,11 @@ public:
         }
     }
 
+    template <typename T>
+    int bind(const T& addr)
+    {
+        return bind((const sockaddr*) &addr, sizeof(addr));
+    }
 
     int bind(const sockaddr *p_addr, socklen_t p_size)
     {
@@ -91,7 +107,7 @@ public:
         return recvfrom(m_fd, p_data.data(), p_data.size(), p_flags, p_addr, p_addr_sz);
     }
 
-    ssize_t send(const bfc::const_buffer_view& p_data, int p_flags)
+    ssize_t send(const bfc::const_buffer_view& p_data, int p_flags = 0)
     {
         return ::send(m_fd, p_data.data(), p_data.size(), p_flags);
     }
@@ -106,14 +122,38 @@ public:
         return setsockopt(m_fd, p_level, p_name, p_value, p_len);
     }
 
-    int listen(int p_size)
+    template <typename T>
+    int set_sock_opt(int p_level, int p_name, T t)
+    {
+        return setsockopt(m_fd, p_level, p_name, (const void *) &t, sizeof(t));
+    }
+
+    int listen(int p_size=10)
     {
         return ::listen(m_fd, p_size);
     }
 
-    int accept(sockaddr* p_addr, socklen_t* p_addr_sz)
+    socket accept(sockaddr* p_addr, socklen_t* p_addr_sz)
     {
-        return ::accept(m_fd, p_addr, p_addr_sz);
+        return socket(::accept(m_fd, p_addr, p_addr_sz));
+    }
+
+    template <typename T>
+    socket accept(T& addr)
+    {
+        socklen_t sz = sizeof(addr);
+        return socket(accept((sockaddr*) &addr, &sz));
+    }
+
+    int connect(const sockaddr* p_addr, socklen_t p_addr_sz)
+    {
+        return ::connect(m_fd, p_addr, p_addr_sz);
+    }
+
+    template <typename T>
+    int connect(const T& addr)
+    {
+        return connect((sockaddr*) &addr, sizeof(addr));
     }
 
     int fd()

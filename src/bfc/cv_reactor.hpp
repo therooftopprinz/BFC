@@ -9,7 +9,6 @@
 #include <sys/unistd.h>
 
 #include <bfc/function.hpp>
-#include <bfc/reactor.hpp>
 
 namespace bfc
 {
@@ -68,7 +67,7 @@ protected:
 };
 
 template <typename T, typename cb_t = light_function<void()>>
-class cv_reactor : public reactor<cv_event_queue<T>*, cb_t>
+class cv_reactor
 {
 public:
     using fd_t = cv_event_queue<T>*;
@@ -85,7 +84,7 @@ public:
         stop();
     }
 
-    bool add(fd_t p_fd, reactor_cb_t p_read_cb) override
+    bool add(fd_t p_fd, reactor_cb_t p_read_cb)
     {
         std::unique_lock lg(m_read_cb_mtx);
         if (m_read_cb_map.count(p_fd))
@@ -97,7 +96,7 @@ public:
         return added;
     }
 
-    bool remove(fd_t p_fd) override
+    bool remove(fd_t p_fd)
     {
         std::unique_lock lg(m_read_cb_mtx);
         if (!m_read_cb_map.count(p_fd))
@@ -144,7 +143,7 @@ public:
     }
 
  private:
-    void wakeup() override
+    void wakeup()
     {
         m_wakeup_req = true;
         m_cv.notify_one();
