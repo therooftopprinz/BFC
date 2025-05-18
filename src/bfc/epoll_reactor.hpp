@@ -20,11 +20,11 @@ namespace detail
 template <typename cb_t = light_function<void()>>
 struct epoll_reactor
 {
-    struct fd_ctx_t
+    struct fd_ctx_s
     {
-        int fd;
+        int fd = -1;
         epoll_event event;
-        cb_t cb;
+        cb_t cb = nullptr;
     };
 
     epoll_reactor(const epoll_reactor&) = delete;
@@ -41,10 +41,14 @@ struct epoll_reactor
             throw std::runtime_error(strerror(errno));
         }
 
-        add(m_event_fd, EPOLLIN, [this](){
+        m_event_fd_ctx.fd = m_event_fd;
+        m_event_fd_ctx.event.events = EPOLLIN;
+        m_event_fd_ctx.cb = [this](){
                 uint64_t one;
                 read(m_event_fd, &one, sizeof(one));
-            });
+            };
+
+        add(m_event_fd_ctx);
     }
 
     ~epoll_reactor()
@@ -54,66 +58,27 @@ struct epoll_reactor
         close(m_epoll_fd);
     }
 
-    bool add(int p_fd, uint32_t event, cb_t cb)
+    int add(fd_ctx_s& ctx)
     {
-        std::unique_lock<std::mutex> lg(m_fd_map_mtx);
-        if (m_fd_map.count(p_fd))
-        {
-            return false;
-        }
-
-        auto ctx = new fd_ctx_t();
-        ctx->cb = std::move(cb);
-        ctx->event.events = event;
-        ctx->event.data.ptr = ctx;
-
-        auto res = epoll_ctl(m_epoll_fd, EPOLL_CTL_ADD, p_fd, &(ctx->event));
-        if (-1 == res)
-        {
-            return false;
-        }
-
-        m_fd_map.emplace(p_fd, ctx);
-        return true;
+        ctx.event.data.ptr = &ctx;
+        return epoll_ctl(m_epoll_fd, EPOLL_CTL_ADD, ctx.fd, &(ctx.event));
     }
 
-    bool del(int p_fd)
+    int del(fd_ctx_s& ctx)
     {
-        std::unique_lock<std::mutex> lg(m_to_del_queue_mtx);
-        m_to_del_queue.emplace_back(p_fd);
-        wakeup();
-        return true;
+        return epoll_ctl(m_epoll_fd, EPOLL_CTL_DEL, ctx.fd, nullptr);
     }
 
-    bool mod(int p_fd, uint32_t event)
+    int mod(fd_ctx_s& ctx)
     {
-        std::unique_lock<std::mutex> lg(m_fd_map_mtx);
-        auto it = m_fd_map.find(p_fd);
-        if (m_fd_map.end() == it)
-        {
-            return false;
-        }
-        auto ctx = it->second;
-        lg.unlock();
-
-        ctx->event.events = event;
-
-        auto res = epoll_ctl(m_epoll_fd, EPOLL_CTL_MOD, p_fd, &(ctx->event));
-
-        if (-1 == res)
-        {
-            return false;
-        }
-
-        return true;
+        return epoll_ctl(m_epoll_fd, EPOLL_CTL_MOD, ctx.fd, &(ctx.event));
     }
 
-    void run()
+    void run(cb_t cb = nullptr)
     {
         m_running = true;
         while (m_running)
         {
-
             auto nfds = epoll_wait(m_epoll_fd, m_event_cache.data(), m_event_cache.size(), -1);
             if (-1 == nfds)
             {
@@ -126,71 +91,60 @@ struct epoll_reactor
 
             for (int i=0; i<nfds; i++)
             {
-                auto* ctx = (fd_ctx_t*) m_event_cache[i].data.ptr;
+                auto* ctx = (fd_ctx_s*) m_event_cache[i].data.ptr;
                 if (ctx->cb)
                 {
                     ctx->cb();
                 }
             }
 
-            std::unique_lock lg(m_to_del_queue_mtx);
-            for (auto i : m_to_del_queue)
             {
-                do_del(i);
+                std::unique_lock lg(m_wake_up_cb_mtx);
+                for (auto& cb : m_wake_up_cb)
+                {
+                    cb();
+                }
+
+                m_wake_up_cb.clear();
             }
-            m_to_del_queue.clear();
+
+            if (cb)
+            {
+                cb();
+            }
         }
     }
 
     void stop()
     {
         m_running = false;
-        wakeup();
+        wake_up();
     }
 
-private:
-    bool do_del(int p_fd)
+    void wake_up(cb_t cb = nullptr)
     {
-        std::unique_lock<std::mutex> lg(m_fd_map_mtx);
-
-        auto it = m_fd_map.find(p_fd);
-
-        if (m_fd_map.end() == it)
+        if (cb)
         {
-            return false;
+            std::unique_lock lg(m_wake_up_cb_mtx);
+            m_wake_up_cb.emplace_back(std::move(cb));
         }
 
-        auto res = epoll_ctl(m_epoll_fd, EPOLL_CTL_DEL, p_fd, nullptr);
-        if (-1 == res)
-        {
-            return false;
-        }
-
-        delete it->second;
-
-        m_fd_map.erase(p_fd);
-
-        return true;
-    }
-
-
-    void wakeup()
-    {
         uint64_t one = 1;
         write(m_event_fd, &one, sizeof(one));
     }
 
+private:
     std::vector<epoll_event> m_event_cache;
 
-    std::mutex m_fd_map_mtx;
-    std::unordered_map<int, fd_ctx_t*> m_fd_map;
+    std::mutex m_wake_up_cb_mtx;
+    std::vector<cb_t> m_wake_up_cb;
 
-    std::mutex m_to_del_queue_mtx;
-    std::deque<int> m_to_del_queue;
 
     int m_epoll_fd;
     int m_event_fd;
     bool m_running;
+
+    fd_ctx_s m_event_fd_ctx;
 };
 
 } // namespace detail
@@ -198,22 +152,83 @@ private:
 template <typename cb_t = light_function<void()>>
 class epoll_reactor
 {
+    using reactor_t = detail::epoll_reactor<cb_t>;
 
 public:
+    class context
+    {
+    public:
+        context(const context&) = delete;
+        context() = delete;
+
+        context(context&& other)
+        {
+            if (-1 != writer.fd)
+            {
+                close(writer.fd);
+            }
+
+            reader.fd = other.reader.fd;
+            reader.event = other.reader.event;
+            reader.cb = std::move(other.reader.cb);
+
+            writer.fd = other.writer.fd;
+            writer.event = other.writer.event;
+            writer.cb = std::move(other.writer.cb);
+        }
+
+        context(int fd)
+        {
+            reader.fd = fd;
+            writer.fd = dup(fd);
+        }
+
+        ~context()
+        {
+            if (-1 != writer.fd)
+            {
+                close(writer.fd);
+            }
+        }
+
+    private:
+        friend class epoll_reactor;
+
+        typename reactor_t::fd_ctx_s reader;
+        typename reactor_t::fd_ctx_s writer;
+    };
+
     epoll_reactor(const epoll_reactor&) = delete;
     void operator=(const epoll_reactor&) = delete;
 
     epoll_reactor(){}
     ~epoll_reactor(){}
 
-    bool add_read_rdy(int p_fd, cb_t cb)
+    context get_context(int fd)
     {
-        return m_reader.add(p_fd, EPOLLIN|EPOLLRDHUP, std::move(cb));
+        return context(fd);
     }
 
-    bool rem_read_rdy(int p_fd)
+    int get_last_error_code()
     {
-        return m_reader.del(p_fd);
+        return errno;
+    }
+
+    std::string get_last_error()
+    {
+        return strerror(errno);
+    }
+
+    bool add_read_rdy(context& ctx, cb_t cb)
+    {
+        ctx.reader.cb = std::move(cb);
+        ctx.reader.event.events = EPOLLIN|EPOLLRDHUP;
+        return m_reactor.add(ctx.reader) == 0;
+    }
+
+    bool rem_read_rdy(context& ctx)
+    {
+        return m_reactor.del(ctx.reader) == 0;
     }
 
     bool req_read(int p_fd)
@@ -221,37 +236,41 @@ public:
         return true;
     }
 
-    bool add_write_rdy(int p_fd, cb_t cb)
+    bool add_write_rdy(context& ctx, cb_t cb)
     {
-        return m_writer.add(p_fd, 0, std::move(cb));
+        ctx.writer.cb = std::move(cb);
+        ctx.writer.event.events = 0;
+        return m_reactor.add(ctx.writer) == 0;
     }
 
-    bool rem_write_rdy(int p_fd)
+    bool rem_write_rdy(context& ctx)
     {
-        return m_writer.del(p_fd);
+        return m_reactor.del(ctx.writer) == 0;
     }
 
-    bool req_write(int p_fd)
+    bool req_write(context& ctx)
     {
-        return m_writer.mod(p_fd, EPOLLOUT|EPOLLONESHOT);
+        ctx.writer.event.events = EPOLLOUT|EPOLLONESHOT;
+        return m_reactor.mod(ctx.writer) == 0;
+    }
+
+    void wake_up(cb_t cb)
+    {
+        m_reactor.wake_up(std::move(cb));
     }
 
     void run()
     {
-        std::thread writer = std::thread([this](){m_writer.run();});
-        m_reader.run();
-        writer.join();
+        m_reactor.run();
     }
 
     void stop()
     {
-        m_writer.stop();
-        m_reader.stop();
+        m_reactor.stop();
     }
 
 private:
-    detail::epoll_reactor<cb_t> m_reader;
-    detail::epoll_reactor<cb_t> m_writer;
+    reactor_t m_reactor;
 };
 
 } // namespace bfc

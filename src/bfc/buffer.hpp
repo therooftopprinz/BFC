@@ -84,9 +84,6 @@ private:
     Deleter  m_deleter;
 };
 
-using Buffer = simple_buffer<std::byte>;
-using ConstBuffer = simple_buffer<const std::byte>;
-
 template<typename T>
 class simple_buffer_view
 {
@@ -142,6 +139,7 @@ private:
 };
 
 using buffer = simple_buffer<std::byte>;
+using const_buffer = simple_buffer<const std::byte>;
 using buffer_view = simple_buffer_view<std::byte>;
 using const_buffer_view = simple_buffer_view<const std::byte>;
 
