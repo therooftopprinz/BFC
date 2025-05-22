@@ -1,8 +1,10 @@
-#ifndef __BFC_EPOLL_REACTOR_HPP__
-#define __BFC_EPOLL_REACTOR_HPP__
+#ifndef __BFC_CV_REACTOR_HPP__
+#define __BFC_CV_REACTOR_HPP__
 
-#include <mutex>
+#include <condition_variable>
 #include <atomic>
+#include <mutex>
+#include <list>
 
 #include <sys/epoll.h>
 #include <sys/eventfd.h>
@@ -13,12 +15,10 @@
 namespace bfc
 {
 
-template <typename T, typename cb_t = light_function<void()>>
+template <typename T, typename reactor_t, typename cb_t = light_function<void()>>
 class cv_event_queue
 {
 public:
-    using reactor_t = reactor<cv_event_queue<T, cb_t>;
-
     cv_event_queue(reactor_t* reactor = nullptr)
         : reactor (reactor)
     {}
@@ -38,7 +38,7 @@ public:
 
         if (reactor)
         {
-            reactor->wakeup();
+            reactor->wake_up();
         }
 
         return rv;
@@ -70,7 +70,8 @@ template <typename T, typename cb_t = light_function<void()>>
 class cv_reactor
 {
 public:
-    using fd_t = cv_event_queue<T>*;
+    using this_type = cv_reactor<T, cb_t>;
+    using fd_t = cv_event_queue<T, this_type, cb_t>*;
 
     cv_reactor(const cv_reactor&) = delete;
     void operator=(const cv_reactor&) = delete;
@@ -84,7 +85,7 @@ public:
         stop();
     }
 
-    bool add(fd_t p_fd, reactor_cb_t p_read_cb)
+    bool add(fd_t p_fd, cb_t cb)
     {
         std::unique_lock lg(m_read_cb_mtx);
         if (m_read_cb_map.count(p_fd))
@@ -92,7 +93,7 @@ public:
             return false;
         }
 
-        auto [it, added] = m_read_cb_map.emplace(p_fd, std::move(p_read_cb));
+        auto [it, added] = m_read_cb_map.emplace(p_fd, std::move(cb));
         return added;
     }
 
@@ -103,7 +104,7 @@ public:
         {
             return false;
         }
-        m_read_cb_map.erase(&reader);
+        m_read_cb_map.erase(p_fd);
         return true;
     }
 
@@ -151,7 +152,7 @@ public:
 
     size_t m_timeout_ms = 100;
 
-    std::map<int, reactor_cb_t> m_read_cb_map;
+    std::map<fd_t, cb_t> m_read_cb_map;
     std::mutex m_read_cb_mtx;
 
     std::mutex m_wakeup_mtx;
@@ -159,7 +160,6 @@ public:
     std::condition_variable m_cv;
 
     bool m_running;
-
 };
 
 } // namespace bfc

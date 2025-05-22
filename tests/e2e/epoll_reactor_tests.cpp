@@ -2,6 +2,9 @@
 #include <bfc/epoll_reactor.hpp>
 #include <bfc/socket.hpp>
 
+// #undef ASSERT_NE
+// #define ASSERT_NE(A, B) B
+
 using namespace bfc;
 
 using r_cb_t = std::function<void()>;
@@ -186,7 +189,7 @@ TEST(epoll_reactor, reactive_write)
             i++;
             if (i >= N)
             {
-                printf("client: stop!\n");
+                // printf("client: stop!\n");
                 return;
             }
             ASSERT_NE(false, reactor.req_write(client_context));
@@ -243,7 +246,7 @@ TEST(epoll_reactor, reactive)
             ctrs.client_write++;
             if (ctrs.client_write >= N)
             {
-                printf("client: stop!\n");
+                // printf("client: stop!\n");
                 return;
             }
 
