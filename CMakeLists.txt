@@ -4,6 +4,9 @@ project(bfc)
 
 set(CMAKE_CXX_STANDARD 17)
 
+set(CMAKE_CXX_FLAGS_DEBUG "-O0 -ggdb3")
+set(CMAKE_CXX_FLAGS_RELEASE "-O3 -Ofast")
+
 add_library(bfc INTERFACE)
 target_include_directories(bfc INTERFACE src)
 

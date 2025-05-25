@@ -45,7 +45,7 @@ struct epoll_reactor
         m_event_fd_ctx.event.events = EPOLLIN;
         m_event_fd_ctx.cb = [this](){
                 uint64_t one;
-                read(m_event_fd, &one, sizeof(one));
+                auto res [[maybe_unused]] = read(m_event_fd, &one, sizeof(one));
             };
 
         add(m_event_fd_ctx);
@@ -130,7 +130,7 @@ struct epoll_reactor
         }
 
         uint64_t one = 1;
-        write(m_event_fd, &one, sizeof(one));
+        auto res [[maybe_unused]] = write(m_event_fd, &one, sizeof(one));
     }
 
 private:
@@ -138,7 +138,6 @@ private:
 
     std::mutex m_wake_up_cb_mtx;
     std::vector<cb_t> m_wake_up_cb;
-
 
     int m_epoll_fd;
     int m_event_fd;
@@ -155,6 +154,8 @@ class epoll_reactor
     using reactor_t = detail::epoll_reactor<cb_t>;
 
 public:
+    using fd_t = int;
+
     class context
     {
     public:
@@ -177,7 +178,7 @@ public:
             writer.cb = std::move(other.writer.cb);
         }
 
-        context(int fd)
+        context(fd_t fd)
         {
             reader.fd = fd;
             writer.fd = dup(fd);
@@ -190,7 +191,6 @@ public:
                 close(writer.fd);
             }
         }
-
     private:
         friend class epoll_reactor;
 
@@ -204,7 +204,7 @@ public:
     epoll_reactor(){}
     ~epoll_reactor(){}
 
-    context get_context(int fd)
+    context make_context(fd_t fd)
     {
         return context(fd);
     }
@@ -231,7 +231,7 @@ public:
         return m_reactor.del(ctx.reader) == 0;
     }
 
-    bool req_read(int p_fd)
+    bool req_read(context&)
     {
         return true;
     }
@@ -259,9 +259,9 @@ public:
         m_reactor.wake_up(std::move(cb));
     }
 
-    void run()
+    void run(cb_t cb = nullptr)
     {
-        m_reactor.run();
+        m_reactor.run(std::move(cb));
     }
 
     void stop()

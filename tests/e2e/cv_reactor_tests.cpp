@@ -1,17 +1,19 @@
 #include <gtest/gtest.h>
 #include <bfc/cv_reactor.hpp>
 
+#include <deque>
 #include <thread>
 
 using namespace bfc;
 
+using r_cb_t = std::function<void()>;
+
 struct fake_reactor
 {
-    void wake_up(){};
+    void wake_up(r_cb_t){};
 };
 
-using r_cb_t = std::function<void()>;
-using queue_t = cv_event_queue<uint64_t, fake_reactor, r_cb_t>;
+using queue_t = reactive_event_queue<uint64_t, fake_reactor, r_cb_t>;
 
 struct counters_t
 {
@@ -21,87 +23,34 @@ struct counters_t
     uint64_t client_write = 0;
 };
 
-constexpr uint64_t N = 5000000;
+constexpr uint64_t N = 1000000;
 
-TEST(cv_reactor, native_st)
+using event_queue_t = event_queue<uint64_t>;
+
+TEST(cv_reactor, eq_blocking_st)
 {
-    std::list<uint64_t> q;
+    event_queue_t q;
 
     auto t_start = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
     for (uint64_t i=0; i<N; i++)
     {
-        q.push_front(i);
-        auto j = q.back();
-        q.pop_back();
+        q.push(i);
+        auto j = q.pop().back();
         ASSERT_EQ(i,j);
     }
     auto t_end = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
     
     auto t_diff = (t_end - t_start);
     auto tput = double(N) * 1000 * 1000 * 1000 / t_diff;
+    tput /= 1000000;
 
-    printf("ms_diff: %lf\n", double(t_diff)/1000000);
     printf("tput: %lf\n", tput);
 }
  
 
-TEST(cv_reactor, native_mt)
+TEST(cv_reactor, eq_blocking_mt)
 {
-    std::mutex m;
-    std::list<uint64_t> q;
-
-    std::thread writer = std::thread([&q, &m](){
-            for (uint64_t i=0; i<N; i++)
-            {
-                std::unique_lock l(m);
-                q.push_back(i);
-            }
-        });
-
-    auto t_start = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
-    uint64_t n = 0;
-    while (n < N)
-    {
-        std::unique_lock l(m);
-        n += q.size();
-        q.clear();
-    }
-    auto t_end = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
-
-    writer.join();
-
-    auto t_diff = (t_end - t_start);
-    auto tput = double(N) * 1000 * 1000 * 1000 / t_diff;
-
-    printf("ms_diff: %lf\n", double(t_diff)/1000000);
-    printf("tput: %lf\n", tput);
-}
-
-
-TEST(cv_reactor, non_reactive_st)
-{
-    queue_t q;
-
-    auto t_start = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
-    for (uint64_t i=0; i<N; i++)
-    {
-        q.push(i);
-        q.pop();
-    }
-    auto t_end = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
-    
-    auto t_diff = (t_end - t_start);
-    auto tput = double(N) * 1000 * 1000 * 1000 / t_diff;
-
-    printf("ms_diff: %lf\n", double(t_diff)/1000000);
-    printf("tput: %lf\n", tput);
-}
- 
-
-TEST(cv_reactor, non_reactive_mt)
-{
-    queue_t q;
-
+    event_queue_t q;
     std::thread writer = std::thread([&q](){
             for (uint64_t i=0; i<N; i++)
             {
@@ -109,6 +58,90 @@ TEST(cv_reactor, non_reactive_mt)
             }
         });
 
+    auto t_start = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+    uint64_t n = 0;
+    while (n < N)
+    {
+        n += q.pop().size();
+    }
+    auto t_end = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+
+    ASSERT_EQ(n, N);
+
+    writer.join();
+
+    auto t_diff = (t_end - t_start);
+    auto tput = double(N) * 1000 * 1000 * 1000 / t_diff;
+    tput /= 1000000;
+
+    printf("tput: %lf\n", tput);
+}
+
+TEST(cv_reactor, eq_nonblocking_mt)
+{
+    event_queue_t q{false};
+    std::thread writer = std::thread([&q](){
+            for (uint64_t i=0; i<N; i++)
+            {
+                q.push(i);
+            }
+        });
+
+    auto t_start = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+    uint64_t n = 0;
+    while (n < N)
+    {
+        n += q.pop().size();
+    }
+    auto t_end = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+
+    ASSERT_EQ(n, N);
+
+    writer.join();
+
+    auto t_diff = (t_end - t_start);
+    auto tput = double(N) * 1000 * 1000 * 1000 / t_diff;
+    tput /= 1000000;
+
+    printf("tput: %lf\n", tput);
+}
+
+TEST(cv_reactor, non_reactive_st)
+{
+    queue_t q;
+    uint64_t n = 0;
+    auto t_start = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+    for (uint64_t i=0; i<N; i++)
+    {
+        q.push(i);
+        auto res = q.pop();
+        n += res.size();
+    }
+    auto t_end = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+
+    ASSERT_EQ(n, N);
+    
+    auto t_diff = (t_end - t_start);
+    auto tput = double(N) * 1000 * 1000 * 1000 / t_diff;
+    tput /= 1000000;
+
+    printf("tput: %lf\n", tput);
+}
+ 
+
+TEST(cv_reactor, non_reactive_mt)
+{
+    queue_t q;
+    std::atomic_bool start=false;
+    std::thread writer = std::thread([&q, &start](){
+            start = true;
+            for (uint64_t i=0; i<N; i++)
+            {
+                q.push(i);
+            }
+        });
+
+    while (!start);
     auto t_start = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
     uint64_t n = 0;
     while (n < N)
@@ -122,8 +155,72 @@ TEST(cv_reactor, non_reactive_mt)
 
     auto t_diff = (t_end - t_start);
     auto tput = double(N) * 1000 * 1000 * 1000 / t_diff;
+    tput /= 1000000;
 
-    printf("ms_diff: %lf\n", double(t_diff)/1000000);
     printf("tput: %lf\n", tput);
 }
- 
+
+TEST(cv_reactor, reactive_st)
+{
+    cv_reactor<uint64_t> reactor;
+    cv_reactor<uint64_t>::context queue(&reactor);
+
+    uint64_t i = 0;
+    reactor.add_read_rdy(queue, [&reactor, &queue, &i](){
+            auto rv = queue.pop();
+            if (i>=N)
+            {
+                reactor.stop();
+                return;
+            }
+            queue.push(i++);
+        });
+
+    queue.push(i++);
+    auto t_start = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+    reactor.run();
+    auto t_end = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+    auto t_diff = (t_end - t_start);
+    auto tput = double(N) * 1000 * 1000 * 1000 / t_diff;
+    tput /= 1000000;
+
+    printf("tput: %lf\n", tput);
+    
+}
+
+TEST(cv_reactor, reactive_mt)
+{
+    cv_reactor<uint64_t> reactor;
+    cv_reactor<uint64_t>::context queue(&reactor);
+
+    reactor.add_read_rdy(queue, [&reactor, &queue](){
+            auto rv = queue.pop();
+            if (rv.size())
+            {
+                auto i = rv.back();
+                if (i>=(N-1))
+                {
+                    reactor.stop();
+                }
+            }
+        });
+
+    std::thread writer = std::thread([&queue](){
+            for (uint64_t i=0; i<N; i++)
+            {
+                queue.push(i);
+            }
+        });
+
+    auto t_start = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+    reactor.run();
+    auto t_end = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+
+    writer.join();
+
+    auto t_diff = (t_end - t_start);
+    auto tput = double(N) * 1000 * 1000 * 1000 / t_diff;
+    tput /= 1000000;
+
+    printf("tput: %lf\n", tput);
+}

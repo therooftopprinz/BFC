@@ -8,6 +8,7 @@
 using namespace bfc;
 
 using r_cb_t = std::function<void()>;
+using reactor_t = bfc::epoll_reactor<r_cb_t>;
 
 struct counters_t
 {
@@ -53,8 +54,8 @@ TEST(epoll_reactor, non_reactive_st)
     
     auto t_diff = (t_end - t_start);
     auto tput = double(N) * 1000 * 1000 * 1000 / t_diff;
+    tput /= 1000000;
 
-    printf("ms_diff: %lf\n", double(t_diff)/1000000);
     printf("tput: %lf\n", tput);
 }
 
@@ -96,14 +97,14 @@ TEST(epoll_reactor, non_reactive_mt)
     
     auto t_diff = (t_end - t_start);
     auto tput = double(N) * 1000 * 1000 * 1000 / t_diff;
+    tput /= 1000000;
 
-    printf("ms_diff: %lf\n", double(t_diff)/1000000);
     printf("tput: %lf\n", tput);
 }
 
 TEST(epoll_reactor, reactive_read)
 {
-    bfc::epoll_reactor<r_cb_t> reactor;
+    reactor_t reactor;
     bfc::socket acceptor(create_tcp4());
     bfc::socket client(create_tcp4());
     bfc::socket server;
@@ -127,7 +128,7 @@ TEST(epoll_reactor, reactive_read)
         }
     });
 
-    auto server_ctx = reactor.get_context(server.fd());
+    auto server_ctx = reactor.make_context(server.fd());
 
     ASSERT_NE(-1, reactor.add_read_rdy(server_ctx, [&reactor, &server](){
             uint64_t b;
@@ -147,14 +148,14 @@ TEST(epoll_reactor, reactive_read)
     
     auto t_diff = (t_end - t_start);
     auto tput = double(N) * 1000 * 1000 * 1000 / t_diff;
+    tput /= 1000000;
 
-    printf("ms_diff: %lf\n", double(t_diff)/1000000);
     printf("tput: %lf\n", tput);
 }
 
 TEST(epoll_reactor, reactive_write)
 {
-    bfc::epoll_reactor<r_cb_t> reactor;
+    reactor_t reactor;
     bfc::socket acceptor(create_tcp4());
     bfc::socket client(create_tcp4());
     bfc::socket server;
@@ -179,7 +180,7 @@ TEST(epoll_reactor, reactive_write)
         reactor.stop();
     });
 
-    auto client_context = reactor.get_context(client.fd());
+    auto client_context = reactor.make_context(client.fd());
 
     uint64_t i=0;
     r_cb_t on_client_write_rdy = [&reactor, &client_context, &client, &i](){
@@ -206,14 +207,14 @@ TEST(epoll_reactor, reactive_write)
     
     auto t_diff = (t_end - t_start);
     auto tput = double(N) * 1000 * 1000 * 1000 / t_diff;
+    tput /= 1000000;
 
-    printf("ms_diff: %lf\n", double(t_diff)/1000000);
     printf("tput: %lf\n", tput);
 }
 
 TEST(epoll_reactor, reactive)
 {
-    bfc::epoll_reactor<r_cb_t> reactor;
+    reactor_t reactor;
     bfc::socket acceptor(create_tcp4());
     bfc::socket client(create_tcp4());
     bfc::socket server;
@@ -236,7 +237,7 @@ TEST(epoll_reactor, reactive)
             }
         };
 
-    auto client_context = reactor.get_context(client.fd());
+    auto client_context = reactor.make_context(client.fd());
 
     r_cb_t on_client_write_rdy = [&reactor, &client, &client_context, &ctrs](){
             uint64_t b = ctrs.client_write;
@@ -260,7 +261,7 @@ TEST(epoll_reactor, reactive)
     printf("server: accepted!\n");
     ASSERT_NE(-1, server.fd());
 
-    auto server_context = reactor.get_context(server.fd());
+    auto server_context = reactor.make_context(server.fd());
     ASSERT_NE(false, reactor.add_read_rdy(server_context, on_server_read_rdy));
 
     reactor.add_write_rdy(client_context, on_client_write_rdy);
@@ -272,9 +273,9 @@ TEST(epoll_reactor, reactive)
     
     auto t_diff = (t_end - t_start);
     auto tput = double(N) * 1000 * 1000 * 1000 / t_diff;
+    tput /= 1000000;
 
     printf("counters.send: %zu\n", ctrs.client_write);
     printf("counters.recv: %zu\n", ctrs.server_read);
-    printf("ms_diff: %lf\n", double(t_diff)/1000000);
     printf("tput: %lf\n", tput);
 }

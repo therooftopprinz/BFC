@@ -11,67 +11,16 @@
 #include <sys/unistd.h>
 
 #include <bfc/function.hpp>
+#include <bfc/event_queue.hpp>
 
 namespace bfc
 {
-
-template <typename T, typename reactor_t, typename cb_t = light_function<void()>>
-class cv_event_queue
-{
-public:
-    cv_event_queue(reactor_t* reactor = nullptr)
-        : reactor (reactor)
-    {}
-
-    ~cv_event_queue()
-    {}
-
-    template <typename U>
-    size_t push(U&& u)
-    {
-        size_t rv;
-        {
-            std::unique_lock<std::mutex> lg(queue_mutex);
-            queue.emplace_back(std::forward<U>(u));
-            rv = queue.size();
-        }
-
-        if (reactor)
-        {
-            reactor->wake_up();
-        }
-
-        return rv;
-    }
-
-    std::list<T> pop()
-    {
-        std::list<T> rv;
-
-        std::unique_lock<std::mutex> lg(queue_mutex);
-        rv.splice(rv.end(), queue, queue.begin(), queue.end());
-
-        return rv;
-    }
-
-    size_t size()
-    {
-        std::unique_lock<std::mutex> lg(queue_mutex);
-        return queue.size();
-    }
-
-protected:
-    std::list<T> queue;
-    std::mutex queue_mutex;
-    reactor_t* reactor = nullptr;
-};
 
 template <typename T, typename cb_t = light_function<void()>>
 class cv_reactor
 {
 public:
-    using this_type = cv_reactor<T, cb_t>;
-    using fd_t = cv_event_queue<T, this_type, cb_t>*;
+    using context = reactive_event_queue<T, cv_reactor<T, cb_t>, cb_t>;
 
     cv_reactor(const cv_reactor&) = delete;
     void operator=(const cv_reactor&) = delete;
@@ -85,78 +34,80 @@ public:
         stop();
     }
 
-    bool add(fd_t p_fd, cb_t cb)
+    context& make_context(context& ctx)
     {
-        std::unique_lock lg(m_read_cb_mtx);
-        if (m_read_cb_map.count(p_fd))
-        {
-            return false;
-        }
-
-        auto [it, added] = m_read_cb_map.emplace(p_fd, std::move(cb));
-        return added;
+        return ctx;
     }
 
-    bool remove(fd_t p_fd)
+    bool add_read_rdy(context& ctx, cb_t cb)
     {
-        std::unique_lock lg(m_read_cb_mtx);
-        if (!m_read_cb_map.count(p_fd))
-        {
-            return false;
-        }
-        m_read_cb_map.erase(p_fd);
+        std::unique_lock lg(ctx.cb_mtx);
+        ctx.cb = std::move(cb);
         return true;
     }
 
-    void run()
+    bool remove_read_rdy(context& ctx)
+    {
+        std::unique_lock lg(ctx.cb_mtx);
+        ctx.cb = nullptr;
+        return true;
+    }
+
+    void run(cb_t cb = nullptr)
     {
         m_running = true;
         while (m_running)
         {
-            std::unique_lock lg(m_wakeup_mtx);
-
-            m_cv.wait_for(lg, std::chrono::milliseconds(m_timeout_ms), [this]()
-                {
-                    return m_wakeup_req.load();
-                });
-
-            lg.unlock();
-
-            bool test = true; 
-            if (m_wakeup_req.compare_exchange_strong(test, false))
             {
-                std::unique_lock lg(m_read_cb_mtx);
-                for (auto& i : m_read_cb_map)
-                {
-                    if (i.first->size())
+                std::unique_lock lg(m_wakeup_mtx);
+
+                m_cv.wait_for(lg, std::chrono::milliseconds(m_timeout_ms), [this]()
                     {
-                        i.second();
+                        return m_wakeup_req;
+                    });
+
+                if (m_wakeup_req)
+                {
+                    m_wakeup_req = false;
+                    auto cb_list = std::move(m_wakeup_cb_list);
+                    lg.unlock();
+                    for (auto& cb : cb_list)
+                    {
+                        cb();
                     }
                 }
             }
+
+            if (cb)
+            {
+                cb();
+            }
         }
+    }
+
+    void wake_up(cb_t cb = nullptr)
+    {
+        std::unique_lock lg(m_wakeup_mtx);
+        if (cb)
+        {
+            m_wakeup_cb_list.emplace_back(std::move(cb));
+        }
+        m_wakeup_req = true;
+        m_cv.notify_one();
     }
 
     void stop()
     {
         m_running = false;
-        wakeup();
+        wake_up();
     }
 
  private:
-    void wakeup()
-    {
-        m_wakeup_req = true;
-        m_cv.notify_one();
-    }
-
     size_t m_timeout_ms = 100;
 
-    std::map<fd_t, cb_t> m_read_cb_map;
-    std::mutex m_read_cb_mtx;
-
     std::mutex m_wakeup_mtx;
-    std::atomic_bool m_wakeup_req = false;
+    bool m_wakeup_req = false;
+    std::list<cb_t> m_wakeup_cb_list;
     std::condition_variable m_cv;
 
     bool m_running;
