@@ -8,39 +8,10 @@
 #include <string_view>
 
 #include <bfc/function.hpp>
+#include <bfc/configuration_parser.hpp>
 
 namespace bfc
 {
-
-class args_map : public std::map<std::string, std::string>
-{
-public:
-    args_map() = default;
-
-    template<typename T>
-    std::optional<T> as(const std::string_view& p_key) const
-    {
-        auto findit = find(p_key.data());
-        if (findit == end())
-        {
-            return std::nullopt;
-        }
-        T rv;
-        std::istringstream iss(findit->second);
-        iss >> rv;
-        return rv;
-    }
-
-    std::optional<std::string> arg(const std::string_view& p_key)
-    {
-        auto findit = find(p_key.data());
-        if (findit == end())
-        {
-            return std::nullopt;
-        }
-        return findit->second;
-    }
-};
 
 template <typename cmd_cb_t = light_function<std::string(args_map&&)>>
 class command_manager
