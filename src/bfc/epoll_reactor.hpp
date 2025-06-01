@@ -159,23 +159,12 @@ public:
     class context
     {
     public:
+        context() = default;
         context(const context&) = delete;
-        context() = delete;
 
         context(context&& other)
         {
-            if (-1 != writer.fd)
-            {
-                close(writer.fd);
-            }
-
-            reader.fd = other.reader.fd;
-            reader.event = other.reader.event;
-            reader.cb = std::move(other.reader.cb);
-
-            writer.fd = other.writer.fd;
-            writer.event = other.writer.event;
-            writer.cb = std::move(other.writer.cb);
+            move_from(std::move(other));
         }
 
         context(fd_t fd)
@@ -186,13 +175,35 @@ public:
 
         ~context()
         {
+            reset_writer();
+        }
+
+        context& operator=(context&& other)
+        {
+            move_from(std::move(other));
+        }
+
+    private:
+        void reset_writer()
+        {
             if (-1 != writer.fd)
             {
                 close(writer.fd);
             }
         }
+        void move_from(context&& other)
+        {
+            reset_writer();
 
-    private:
+            reader.fd = other.reader.fd;
+            reader.event = other.reader.event;
+            reader.cb = std::move(other.reader.cb);
+
+            writer.fd = other.writer.fd;
+            writer.event = other.writer.event;
+            writer.cb = std::move(other.writer.cb);
+        }
+
         friend class epoll_reactor;
 
         typename reactor_t::fd_ctx_s reader;
