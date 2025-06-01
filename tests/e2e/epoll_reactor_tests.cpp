@@ -27,10 +27,10 @@ TEST(epoll_reactor, non_reactive_st)
     bfc::socket server;
 
     acceptor.set_sock_opt(SOL_SOCKET , SO_REUSEADDR, 1);
-    ASSERT_NE(-1, acceptor.bind(to_ip_port(localhost4, 12345)));
+    ASSERT_NE(-1, acceptor.bind(ip4_port_to_sockaddr(localhost4, 12345)));
     ASSERT_NE(-1, acceptor.listen());
 
-    ASSERT_NE(-1, client.connect(to_ip_port(localhost4, 12345)));
+    ASSERT_NE(-1, client.connect(ip4_port_to_sockaddr(localhost4, 12345)));
     printf("client: connected!\n");
 
     server = std::move(acceptor.accept(nullptr, nullptr));
@@ -66,10 +66,10 @@ TEST(epoll_reactor, non_reactive_mt)
     bfc::socket server;
 
     acceptor.set_sock_opt(SOL_SOCKET , SO_REUSEADDR, 1);
-    ASSERT_NE(-1, acceptor.bind(to_ip_port(localhost4, 12345)));
+    ASSERT_NE(-1, acceptor.bind(ip4_port_to_sockaddr(localhost4, 12345)));
     ASSERT_NE(-1, acceptor.listen());
 
-    ASSERT_NE(-1, client.connect(to_ip_port(localhost4, 12345)));
+    ASSERT_NE(-1, client.connect(ip4_port_to_sockaddr(localhost4, 12345)));
     printf("client: connected!\n");
 
     server = std::move(acceptor.accept(nullptr, nullptr));
@@ -110,10 +110,10 @@ TEST(epoll_reactor, reactive_read)
     bfc::socket server;
 
     acceptor.set_sock_opt(SOL_SOCKET , SO_REUSEADDR, 1);
-    ASSERT_NE(-1, acceptor.bind(to_ip_port(localhost4, 12345)));
+    ASSERT_NE(-1, acceptor.bind(ip4_port_to_sockaddr(localhost4, 12345)));
     ASSERT_NE(-1, acceptor.listen());
 
-    ASSERT_NE(-1, client.connect(to_ip_port(localhost4, 12345)));
+    ASSERT_NE(-1, client.connect(ip4_port_to_sockaddr(localhost4, 12345)));
     printf("client: connected!\n");
 
     server = std::move(acceptor.accept(nullptr, nullptr));
@@ -161,10 +161,10 @@ TEST(epoll_reactor, reactive_write)
     bfc::socket server;
 
     acceptor.set_sock_opt(SOL_SOCKET , SO_REUSEADDR, 1);
-    ASSERT_NE(-1, acceptor.bind(to_ip_port(localhost4, 12345)));
+    ASSERT_NE(-1, acceptor.bind(ip4_port_to_sockaddr(localhost4, 12345)));
     ASSERT_NE(-1, acceptor.listen());
 
-    ASSERT_NE(-1, client.connect(to_ip_port(localhost4, 12345)));
+    ASSERT_NE(-1, client.connect(ip4_port_to_sockaddr(localhost4, 12345)));
     printf("client: connected!\n");
 
     server = std::move(acceptor.accept(nullptr, nullptr));
@@ -222,7 +222,7 @@ TEST(epoll_reactor, reactive)
     counters_t ctrs;
 
     acceptor.set_sock_opt(SOL_SOCKET , SO_REUSEADDR, 1);
-    ASSERT_NE(-1, acceptor.bind(to_ip_port(localhost4, 12345)));
+    ASSERT_NE(-1, acceptor.bind(ip4_port_to_sockaddr(localhost4, 12345)));
     ASSERT_NE(-1, acceptor.listen());
 
     r_cb_t on_server_read_rdy = [&reactor, &server, &ctrs](){
@@ -255,7 +255,7 @@ TEST(epoll_reactor, reactive)
             ASSERT_NE(-1, reactor.req_write(client_context));
         };
 
-    ASSERT_NE(-1, client.connect(to_ip_port(localhost4, 12345)));
+    ASSERT_NE(-1, client.connect(ip4_port_to_sockaddr(localhost4, 12345)));
     printf("client: connected!\n");
     server = std::move(acceptor.accept(nullptr, nullptr));
     printf("server: accepted!\n");

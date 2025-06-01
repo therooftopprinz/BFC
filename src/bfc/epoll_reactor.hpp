@@ -191,6 +191,7 @@ public:
                 close(writer.fd);
             }
         }
+
     private:
         friend class epoll_reactor;
 

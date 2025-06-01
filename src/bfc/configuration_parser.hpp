@@ -37,7 +37,7 @@ public:
         return rv;
     }
 
-    std::optional<std::string> arg(const std::string_view& p_key)
+    std::optional<std::string> arg(const std::string_view& p_key) const
     {
         auto findit = find(p_key.data());
         if (findit == end())

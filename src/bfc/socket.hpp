@@ -3,7 +3,10 @@
 
 #include <netinet/in.h>
 #include <sys/socket.h>
+#include <arpa/inet.h>
 #include <unistd.h>
+#include <inttypes.h>
+
 #include <memory>
 #include <string>
 #include <stdexcept>
@@ -13,7 +16,7 @@
 namespace bfc
 {
 
-constexpr uint32_t to_ip(uint8_t a, uint8_t b, uint8_t c, uint8_t d)
+inline constexpr uint32_t to_ip(uint8_t a, uint8_t b, uint8_t c, uint8_t d)
 {
     uint32_t 
     rv =  (uint32_t(a) << 24);
@@ -25,7 +28,7 @@ constexpr uint32_t to_ip(uint8_t a, uint8_t b, uint8_t c, uint8_t d)
 
 constexpr uint32_t localhost4 = to_ip(127,0,0,1);
 
-sockaddr_in to_ip_port(uint32_t ip, uint16_t port)
+inline sockaddr_in ip4_port_to_sockaddr(uint32_t ip, uint16_t port)
 {
     sockaddr_in addr;
     memset((char *)&addr, 0, sizeof(addr));
@@ -35,9 +38,60 @@ sockaddr_in to_ip_port(uint32_t ip, uint16_t port)
     return addr;
 }
 
-int create_tcp4()
+inline sockaddr_in ip4_port_to_sockaddr(std::string ip, uint16_t port)
+{
+    sockaddr_in addr;
+    memset((char *)&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(port);
+    inet_pton(AF_INET, ip.c_str(), &addr.sin_addr);  
+    return addr;
+}
+
+inline sockaddr_in6 ip6_port_to_sockaddr(std::string ip, uint16_t port)
+{
+    sockaddr_in6 addr;
+    memset((char *)&addr, 0, sizeof(addr));
+    addr.sin6_family = AF_INET6;
+    addr.sin6_port = htons(port);
+    inet_pton(AF_INET6, ip.c_str(), &addr.sin6_addr);  
+    return addr;
+}
+
+inline std::string sockaddr_to_string(sockaddr *addr)
+{
+    char buffer[64];
+    char out[72];
+    in_port_t port = 0;
+    if (addr->sa_family == AF_INET)
+    {
+        sockaddr_in* addr4 = (sockaddr_in*) addr;
+        port = ntohs(addr4->sin_port);
+        inet_ntop(AF_INET, &addr4->sin_addr, buffer, sizeof(buffer));
+    }
+    else if (addr->sa_family == AF_INET6)
+    {
+        sockaddr_in6* addr6 = (sockaddr_in6*) addr;
+        port = ntohs(addr6->sin6_port);
+        inet_ntop(AF_INET6, &addr6->sin6_addr, buffer, sizeof(buffer));
+    }
+    else
+    {
+        strncpy(buffer, "unknown_family", sizeof(buffer));
+    }
+
+    snprintf(out, sizeof(out), "%s:%" PRIu16, buffer, port);
+    return out;
+}
+
+inline int create_tcp4()
 {
     return ::socket(AF_INET, SOCK_STREAM, 0);
+}
+
+inline int create_tcp6()
+{
+    return ::socket(AF_INET6, SOCK_STREAM, 0);
 }
 
 class socket
