@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.15)
-project(bfc VERSION 1.0.47 LANGUAGES CXX)
+project(bfc VERSION 1.0.49 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_FLAGS_DEBUG "-O0 -ggdb3")
@@ -40,7 +40,7 @@ install(
     FILES
         ${CMAKE_CURRENT_BINARY_DIR}/bfcConfig.cmake
         ${CMAKE_CURRENT_BINARY_DIR}/bfcConfigVersion.cmake
-    DESTINATION lib/cmake/cum)
+    DESTINATION lib/cmake/bfc)
 
 install(
     EXPORT bfc
