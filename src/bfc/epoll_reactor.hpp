@@ -175,33 +175,30 @@ public:
 
         ~context()
         {
-            reset_writer();
-        }
-
-        context& operator=(context&& other)
-        {
-            move_from(std::move(other));
-        }
-
-    private:
-        void reset_writer()
-        {
             if (-1 != writer.fd)
             {
                 close(writer.fd);
             }
         }
+
+        context& operator=(context&& other)
+        {
+            move_from(std::move(other));
+            return *this;
+        }
+
+    private:
         void move_from(context&& other)
         {
-            reset_writer();
-
             reader.fd = other.reader.fd;
             reader.event = other.reader.event;
             reader.cb = std::move(other.reader.cb);
+            other.reader.fd = -1;
 
             writer.fd = other.writer.fd;
             writer.event = other.writer.event;
             writer.cb = std::move(other.writer.cb);
+            other.writer.fd = -1;
         }
 
         friend class epoll_reactor;
