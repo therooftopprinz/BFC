@@ -94,6 +94,16 @@ inline int create_tcp6()
     return ::socket(AF_INET6, SOCK_STREAM, 0);
 }
 
+inline int create_udp4()
+{
+    return ::socket(AF_INET, SOCK_DGRAM, 0);
+}
+
+inline int create_udp6()
+{
+    return ::socket(AF_INET6, SOCK_DGRAM, 0);
+}
+
 class socket
 {
 public:
@@ -156,7 +166,7 @@ public:
         return sendto(m_fd, p_data.data(), p_data.size(), p_flags, p_to, p_to_size);
     }
 
-    ssize_t recv(bfc::buffer_view& p_data, int p_flags, sockaddr* p_addr, socklen_t* p_addr_sz)
+    ssize_t recv(bfc::buffer_view&& p_data, int p_flags, sockaddr* p_addr, socklen_t* p_addr_sz)
     {
         return recvfrom(m_fd, p_data.data(), p_data.size(), p_flags, p_addr, p_addr_sz);
     }

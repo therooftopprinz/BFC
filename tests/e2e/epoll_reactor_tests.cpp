@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 #include <bfc/epoll_reactor.hpp>
 #include <bfc/socket.hpp>
+#include <atomic>
+#include <netinet/tcp.h>
 
 // #undef ASSERT_NE
 // #define ASSERT_NE(A, B) B
@@ -18,7 +20,13 @@ struct counters_t
     uint64_t client_write = 0;
 };
 
-constexpr uint64_t N = 500000;
+constexpr uint64_t N = 100000;
+
+template <typename T=std::chrono::microseconds>
+static uint64_t now()
+{
+    return std::chrono::duration_cast<T>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+}
 
 TEST(epoll_reactor, non_reactive_st)
 {
@@ -36,17 +44,28 @@ TEST(epoll_reactor, non_reactive_st)
     server = std::move(acceptor.accept(nullptr, nullptr));
     printf("server: accepted!\n");
 
+    // server.set_sock_opt(IPPROTO_TCP, TCP_NODELAY, int(1));
+    // client.set_sock_opt(IPPROTO_TCP, TCP_NODELAY, int(1));
+
+    uint64_t total_latency = 0;
+    uint64_t lo_latency = std::numeric_limits<uint64_t>::max();
+    uint64_t hi_latency = std::numeric_limits<uint64_t>::min();
+
     auto t_start = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
     for (uint64_t i=0; i < N; i++)
     {
         {
-            uint64_t b = i;
+            uint64_t b = now();
             buffer_view wb((std::byte*) &b, sizeof(b));
             ASSERT_NE(-1, client.send(wb, 0));
         }
         {
             uint64_t b;
             buffer_view rb((std::byte*) &b, sizeof(b));
+            auto lat = uint64_t((now()-b));
+            if (lat > hi_latency) hi_latency = lat;
+            if (lat < lo_latency) lo_latency = lat;
+            total_latency += lat;
             ASSERT_NE(-1, server.recv(rb, 0));
         }
     }
@@ -55,8 +74,8 @@ TEST(epoll_reactor, non_reactive_st)
     auto t_diff = (t_end - t_start);
     auto tput = double(N) * 1000 * 1000 * 1000 / t_diff;
     tput /= 1000000;
-
-    printf("tput: %lf\n", tput);
+    auto ave_lat = double(total_latency)/N;
+    printf("tput_meghz: %lf latency_us: %lf hi_latency_us: %zu lo_latency_us: %zu\n", tput, ave_lat, hi_latency, lo_latency);
 }
 
 TEST(epoll_reactor, non_reactive_mt)
@@ -75,14 +94,25 @@ TEST(epoll_reactor, non_reactive_mt)
     server = std::move(acceptor.accept(nullptr, nullptr));
     printf("server: accepted!\n");
 
+    // server.set_sock_opt(IPPROTO_TCP, TCP_NODELAY, int(1));
+    // client.set_sock_opt(IPPROTO_TCP, TCP_NODELAY, int(1));
+
+    std::atomic_bool start = false;
     std::thread sender = std::thread([&](){
+        start = true;
         for (uint64_t i=0; i < N; i++)
         {
-            uint64_t b = i;
+            uint64_t b = now();
             buffer_view wb((std::byte*) &b, sizeof(b));
             ASSERT_NE(-1, client.send(wb, 0));
         }
     });
+
+    while(!start);
+
+    uint64_t total_latency = 0;
+    uint64_t lo_latency = std::numeric_limits<uint64_t>::max();
+    uint64_t hi_latency = std::numeric_limits<uint64_t>::min();
 
     auto t_start = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
     for (uint64_t i=0; i < N; i++)
@@ -90,6 +120,10 @@ TEST(epoll_reactor, non_reactive_mt)
         uint64_t b;
         buffer_view rb((std::byte*) &b, sizeof(b));
         ASSERT_NE(-1, server.recv(rb, 0));
+        auto lat = uint64_t((now()-b));
+        if (lat > hi_latency) hi_latency = lat;
+        if (lat < lo_latency) lo_latency = lat;
+        total_latency += lat;
     }
     auto t_end = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
 
@@ -98,8 +132,8 @@ TEST(epoll_reactor, non_reactive_mt)
     auto t_diff = (t_end - t_start);
     auto tput = double(N) * 1000 * 1000 * 1000 / t_diff;
     tput /= 1000000;
-
-    printf("tput: %lf\n", tput);
+    auto ave_lat = double(total_latency)/N;
+    printf("tput_meghz: %lf latency_us: %lf hi_latency_us: %zu lo_latency_us: %zu\n", tput, ave_lat, hi_latency, lo_latency);
 }
 
 TEST(epoll_reactor, reactive_read)
@@ -119,10 +153,15 @@ TEST(epoll_reactor, reactive_read)
     server = std::move(acceptor.accept(nullptr, nullptr));
     printf("server: accepted!\n");
 
+    // server.set_sock_opt(IPPROTO_TCP, TCP_NODELAY, int(1));
+    // client.set_sock_opt(IPPROTO_TCP, TCP_NODELAY, int(1));
+
+    std::atomic_bool start = false;
     std::thread sender = std::thread([&](){
+        start = true;
         for (uint64_t i=0; i < N; i++)
         {
-            uint64_t b = i;
+            uint64_t b = now();
             buffer_view wb((std::byte*) &b, sizeof(b));
             ASSERT_NE(-1, client.send(wb, 0));
         }
@@ -130,16 +169,29 @@ TEST(epoll_reactor, reactive_read)
 
     auto server_ctx = reactor.make_context(server.fd());
 
-    ASSERT_NE(-1, reactor.add_read_rdy(server_ctx, [&reactor, &server](){
+    uint64_t total_latency = 0;
+    uint64_t lo_latency = std::numeric_limits<uint64_t>::max();
+    uint64_t hi_latency = std::numeric_limits<uint64_t>::min();
+
+    uint64_t rcx = 0;
+    ASSERT_NE(-1, reactor.add_read_rdy(server_ctx, [&](){
             uint64_t b;
             buffer_view rb((std::byte*) &b, sizeof(b));
             ASSERT_NE(-1, server.recv(rb, 0));
-            if (b >= N-1)
+
+            auto lat = uint64_t((now()-b));
+            if (lat > hi_latency) hi_latency = lat;
+            if (lat < lo_latency) lo_latency = lat;
+            total_latency += lat;
+
+            if (rcx >= (N-1))
             {
                 reactor.stop();
             }
+            rcx++;
         }));
 
+    while(!start);
     auto t_start = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
     reactor.run();
     auto t_end = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
@@ -149,8 +201,8 @@ TEST(epoll_reactor, reactive_read)
     auto t_diff = (t_end - t_start);
     auto tput = double(N) * 1000 * 1000 * 1000 / t_diff;
     tput /= 1000000;
-
-    printf("tput: %lf\n", tput);
+    auto ave_lat = double(total_latency)/N;
+    printf("tput_meghz: %lf latency_us: %lf hi_latency_us: %zu lo_latency_us: %zu\n", tput, ave_lat, hi_latency, lo_latency);
 }
 
 TEST(epoll_reactor, reactive_write)
@@ -169,6 +221,9 @@ TEST(epoll_reactor, reactive_write)
 
     server = std::move(acceptor.accept(nullptr, nullptr));
     printf("server: accepted!\n");
+
+    // server.set_sock_opt(IPPROTO_TCP, TCP_NODELAY, int(1));
+    // client.set_sock_opt(IPPROTO_TCP, TCP_NODELAY, int(1));
 
     std::thread receiver = std::thread([&](){
         for (uint64_t i=0; i < N; i++)
@@ -260,6 +315,9 @@ TEST(epoll_reactor, reactive)
     server = std::move(acceptor.accept(nullptr, nullptr));
     printf("server: accepted!\n");
     ASSERT_NE(-1, server.fd());
+
+    // server.set_sock_opt(IPPROTO_TCP, TCP_NODELAY, int(1));
+    // client.set_sock_opt(IPPROTO_TCP, TCP_NODELAY, int(1));
 
     auto server_context = reactor.make_context(server.fd());
     ASSERT_NE(false, reactor.add_read_rdy(server_context, on_server_read_rdy));

@@ -34,9 +34,10 @@ public:
         stop();
     }
 
-    context& make_context(context& ctx)
+    template <typename... Ts>
+    context& make_context(Ts&&... ts)
     {
-        return ctx;
+        return context(std::forward<Ts>(ts)...);
     }
 
     bool add_read_rdy(context& ctx, cb_t cb)
