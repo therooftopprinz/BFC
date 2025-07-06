@@ -8,15 +8,14 @@
 namespace bfc
 {
 
-template<typename T, typename Deleter = light_function<void(void*)>>
+template<typename T, typename D = light_function<void(const void*)>>
 class simple_buffer
 {
-    static_assert(sizeof(T)==1);
 public:
     template <typename U>
-    simple_buffer(U* pData, size_t pSize, Deleter p_deleter = [](void* p_ptr){delete[] (T*)p_ptr;})
-        : m_size(pSize)
-        , m_data(pData)
+    simple_buffer(U* p_data, size_t p_size, D p_deleter = [](const void* p_ptr){delete[] (const T*)p_ptr;})
+        : m_size(p_size)
+        , m_data(p_data)
         , m_deleter(std::move(p_deleter))
     {
         static_assert(sizeof(U)==1);
@@ -34,7 +33,7 @@ public:
     simple_buffer(simple_buffer&& p_other) noexcept
     {
         reset();
-        transferOwnership(std::move(p_other));
+        transfer(std::move(p_other));
     }
 
     simple_buffer& operator=(simple_buffer&& p_other) noexcept
@@ -58,7 +57,7 @@ public:
     {
         if (m_data)
         {
-            m_deleter((T*)m_data);
+            m_deleter((const T*)m_data);
         }
         clear(std::move(*this));
     }
@@ -81,45 +80,36 @@ private:
 
     size_t m_size = 0;
     T* m_data = nullptr;
-    Deleter  m_deleter;
+    D  m_deleter;
+
+    static_assert(sizeof(T)==1);
 };
 
 template<typename T>
 class simple_buffer_view
 {
-    using NCT = typename std::remove_const<T>::type;
-    using CT = typename std::add_const<NCT>::type;
-    static constexpr bool IS_T_CONST = std::is_const<T>::value;
-    static_assert(sizeof(T)==1);
 public:
-    /* Constructors
-    ** NCT -> CT  OK
-    ** NCT -> NCT OK
-    ** CT  -> CT  OK
-    ** CT  -> NCT NOK
-    */ 
-    template<template<class> class U, class V>
-    simple_buffer_view(const U<V>& pBuffer,
-        typename std::enable_if<std::is_same<V,NCT>::value||std::is_same<V,T>::value>::type* = 0)
-        : m_size(pBuffer.size())
-        , m_data(pBuffer.data())
+    simple_buffer_view() = default;
+
+    template<typename U>
+    simple_buffer_view(U&& p_buffer)
+        : m_size(p_buffer.size())
+        , m_data(p_buffer.data())
     {}
 
     template <typename U>
-    simple_buffer_view(U* data, size_t size,
-        typename std::enable_if<(std::is_const<U>::value && IS_T_CONST) || !std::is_const<U>::value>::type* = 0)
+    simple_buffer_view(U* data, size_t size)
         : m_size(size)
-        , m_data(data)
+        , m_data(reinterpret_cast<T*>(data))
     {
         static_assert(sizeof(U)==1);
     }
 
-    template<template<class> class U, class V>
-    typename std::enable_if<std::is_same<V,NCT>::value||std::is_same<V,T>::value,simple_buffer_view>::type&
-        operator=(U<V> pBuffer)
+    template<typename U>
+    simple_buffer_view& operator=(U&& p_buffer)
     {
-        m_size = pBuffer.size();
-        m_data = pBuffer.data();
+        m_size = p_buffer.size();
+        m_data = p_buffer.data();
         return *this;
     }
 
@@ -136,6 +126,8 @@ public:
 private:
     size_t m_size = 0;
     T* m_data = nullptr;
+
+    static_assert(sizeof(T)==1);
 };
 
 using buffer = simple_buffer<std::byte>;

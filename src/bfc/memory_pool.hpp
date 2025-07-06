@@ -32,7 +32,7 @@ public:
     buffer allocate()
     {
         std::byte* rv = allocate_raw();
-        return buffer(rv, m_size, [this](void* p_ptr){free(p_ptr);});
+        return buffer(rv, m_size, [this](const void* p_ptr){free(p_ptr);});
     }
 
     void free(const void* p_ptr)
