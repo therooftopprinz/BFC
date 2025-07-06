@@ -161,22 +161,26 @@ public:
         return ::bind(m_fd, p_addr, p_size);
     }
 
-    ssize_t send(const bfc::const_buffer_view& p_data, int p_flags, const sockaddr* p_to, socklen_t p_to_size)
+    template <typename T>
+    ssize_t send(const T& p_data, int p_flags, const sockaddr* p_to, socklen_t p_to_size)
     {
         return sendto(m_fd, p_data.data(), p_data.size(), p_flags, p_to, p_to_size);
     }
 
-    ssize_t recv(bfc::buffer_view&& p_data, int p_flags, sockaddr* p_addr, socklen_t* p_addr_sz)
-    {
-        return recvfrom(m_fd, p_data.data(), p_data.size(), p_flags, p_addr, p_addr_sz);
-    }
-
-    ssize_t send(const bfc::const_buffer_view& p_data, int p_flags = 0)
+    template <typename T>
+    ssize_t send(const T& p_data, int p_flags = 0)
     {
         return ::send(m_fd, p_data.data(), p_data.size(), p_flags);
     }
 
-    ssize_t recv(bfc::buffer_view& p_data, int p_flags)
+    template <typename T>
+    ssize_t recv(T&& p_data, int p_flags, sockaddr* p_addr, socklen_t* p_addr_sz)
+    {
+        return recvfrom(m_fd, p_data.data(), p_data.size(), p_flags, p_addr, p_addr_sz);
+    }
+
+    template <typename T>
+    ssize_t recv(T&& p_data, int p_flags)
     {
         return ::recv(m_fd, p_data.data(), p_data.size(), p_flags);
     }
