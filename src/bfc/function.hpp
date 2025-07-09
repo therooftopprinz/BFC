@@ -151,7 +151,7 @@ private:
         m_fn = nullptr;
     }
 
-    uint8_t m_object[N];
+    std::byte m_object[N];
     return_t (*m_fn)(const void *, args_t...) = nullptr;
     void (*m_destroyer)(void *) = nullptr;
     void (*m_copier)(void *, const void *) = nullptr;

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.15)
-project(bfc VERSION 1.0.55 LANGUAGES CXX)
+project(bfc VERSION 1.0.56 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_FLAGS_DEBUG "-O0 -ggdb3")
@@ -18,7 +18,7 @@ target_include_directories(bfc INTERFACE
 install(
     DIRECTORY src/bfc
     DESTINATION include
-    FILES_MATCHING PATTERN "*.hpp")
+    FILES_MATCHING PATTERN "*.hpp")df
 
 install(
     TARGETS bfc
