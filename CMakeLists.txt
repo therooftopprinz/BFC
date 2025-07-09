@@ -18,7 +18,7 @@ target_include_directories(bfc INTERFACE
 install(
     DIRECTORY src/bfc
     DESTINATION include
-    FILES_MATCHING PATTERN "*.hpp")df
+    FILES_MATCHING PATTERN "*.hpp")
 
 install(
     TARGETS bfc
